@@ -114,8 +114,7 @@ export function* routeIndependentBuses(
         undefined,
         new Map(),
         () => false,
-        false,
-        !!pair && pairHasUnroutedNativePads(input, pair),
+        { checkReachability: !!pair && pairHasUnroutedNativePads(input, pair) },
       )
       let state = search.next(),
         steps = 0

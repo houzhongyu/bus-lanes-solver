@@ -528,6 +528,7 @@ export class BusLanesSolver extends BaseSolver {
         },
         this.terminalLayers,
         () => this.reservePackageExits!,
+        { analyticFallback: this.options.analyticFallback },
       )
       const step = this.negotiated.next()
       if (!step.done) {

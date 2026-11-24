@@ -1,11 +1,11 @@
 import { maximumCarrierLength } from "./route-lengths"
+import { routeAnalyticLane } from "./route-analytic-lane"
 import { refineRouteCandidates } from "./refine-route-candidates"
 import { routeViaWaypoint } from "./route-via-waypoint"
 import { pendingLaneCertificates } from "./pending-lane-certificates"
 import { RouteCandidatePool } from "./select-route-candidates"
 import { routeCoupledPair } from "./coupled-pair-routing"
 import { GridHistoryProjector, GridVisibilitySearch } from "./grid-visibility"
-import { VectorVisibilitySearch } from "./vector-visibility"
 import { VectorScene, routeCopper, type Copper } from "./vector-scene"
 import { length } from "./geometry"
 import { RouteConflictIndex } from "./route-conflict-index"
@@ -26,8 +26,15 @@ export function* negotiateLanes(
   reportProgress?: (pass: number, conflictingLanes: number) => void,
   terminalLayers: ReadonlyMap<string, string[]> = new Map(),
   enableTerminalReservations: () => boolean = () => true,
-  deferRetainedSelfClearance = false,
-  checkReachability = false,
+  {
+    deferRetainedSelfClearance = false,
+    checkReachability = false,
+    analyticFallback = false,
+  }: {
+    deferRetainedSelfClearance?: boolean
+    checkReachability?: boolean
+    analyticFallback?: boolean
+  } = {},
 ): Generator<Trace[], Trace[] | null> {
   const flexibleTerminals = connections.some(
     (connection) => (terminalLayers.get(connection.name)?.length ?? 1) > 1,
@@ -320,7 +327,7 @@ export function* negotiateLanes(
           candidateLayer === layer
             ? scene
             : new VectorScene(input, connection, width, sceneCopper)
-        let candidateSearch: GridVisibilitySearch | VectorVisibilitySearch =
+        let candidateSearch =
           candidateLayer === layer
             ? search
             : new GridVisibilitySearch(
@@ -350,11 +357,7 @@ export function* negotiateLanes(
             yield progressRoutes
           }
         } finally {
-          if (
-            candidateSearch instanceof GridVisibilitySearch &&
-            !candidateSearch.solved &&
-            !candidateSearch.failed
-          )
+          if (!candidateSearch.solved && !candidateSearch.failed)
             candidateSearch.cancel()
         }
         if (!candidateSearch.solved && limits.has(connection.name)) {
@@ -381,19 +384,6 @@ export function* negotiateLanes(
           } finally {
             if (!candidateSearch.solved && !candidateSearch.failed)
               candidateSearch.cancel()
-          }
-          // A finite raster can miss a legal narrow passage between vias.
-          // Reuse the analytic search before declaring the fixed copper closed.
-          if (!candidateSearch.solved) {
-            candidateSearch = new VectorVisibilitySearch(
-              candidateScene,
-              connection.pointsToConnect[0],
-              connection.pointsToConnect[1],
-            )
-            while (!candidateSearch.solved && !candidateSearch.failed) {
-              candidateSearch.step()
-              yield progressRoutes
-            }
           }
           if (
             candidateSearch.solved &&
@@ -502,6 +492,23 @@ export function* negotiateLanes(
           candidates.add(connection.name, [choice.trace])
           if (!bestChoice || score < bestChoice.score) bestChoice = choice
         }
+      }
+      if (!bestChoice && analyticFallback) {
+        const analytic = routeAnalyticLane({
+          input,
+          connection,
+          width,
+          layers: available,
+          hardCopper: sceneCopper,
+          routedTraces: [...routed.values()],
+          maxLengthMm: maximumCarrierLength(input, connection.name),
+        })
+        let step = analytic.next()
+        while (!step.done) {
+          yield progressRoutes
+          step = analytic.next()
+        }
+        bestChoice = step.value
       }
       if (!bestChoice) {
         if (!certificatePaths.length) return null

@@ -94,6 +94,8 @@ export interface SimpleRouteJson {
   }>
 }
 export interface SolverOptions {
+  /** Recover narrow passages analytically after all raster layers fail. */
+  analyticFallback?: boolean
   /** Reject paired tuning that folds back into a generated terminal via land. */
   protectPairedTerminalVias?: boolean
   /** Candidate budget for tuning the original paired corridor. */

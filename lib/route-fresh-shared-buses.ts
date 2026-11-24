@@ -146,8 +146,7 @@ export function* routeFreshSharedBuses(
       undefined,
       layers,
       () => false,
-      true,
-      true,
+      { deferRetainedSelfClearance: true, checkReachability: true },
     )
     let state: FlexibleSignalState | undefined
     try {
