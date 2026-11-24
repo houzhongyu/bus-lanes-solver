@@ -1,7 +1,4 @@
-import {
-  effectiveCarrierLayers,
-  explicitlyAllowsCarrierLayer,
-} from "./effective-carrier-layers"
+import { effectiveCarrierLayers } from "./effective-carrier-layers"
 import { nativeGroupsEligible, routeNativeGroups } from "./route-native-groups"
 import {
   pinnedNativeBusesEligible,
@@ -1028,11 +1025,7 @@ export class BusLanesPipelineSolver extends BaseSolver {
     this.hasNativeCarrierAlternatives = false
     for (const connection of this.routingInput.connections) {
       const explicitPadLayer = connection.pointsToConnect.every((point) =>
-        explicitlyAllowsCarrierLayer(
-          this.routingInput,
-          connection,
-          point.layer,
-        ),
+        this.routingInput.allowedLayers?.includes(point.layer),
       )
       if (
         !explicitPadLayer &&
@@ -1075,11 +1068,7 @@ export class BusLanesPipelineSolver extends BaseSolver {
           vias.every(
             (via) =>
               layer !== via.from_layer ||
-              explicitlyAllowsCarrierLayer(
-                this.routingInput,
-                connection,
-                layer,
-              ),
+              this.routingInput.allowedLayers?.includes(layer),
           ),
       )
       if (available.length < supported.length)
@@ -1643,6 +1632,7 @@ export class BusLanesPipelineSolver extends BaseSolver {
         [
           "no_planar_route",
           "coupled_routing_failed",
+          "length_matching_failed",
           "search_budget_exhausted",
         ].includes(this.child.failureCode ?? "") &&
         this.retryWithNativeCarriers(this.child.failureCode!)
