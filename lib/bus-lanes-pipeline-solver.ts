@@ -638,7 +638,10 @@ export class BusLanesPipelineSolver extends BaseSolver {
       ...this.options,
       analyticFallback:
         this.options.analyticFallback ||
-        this.carrierStrategy.name === "native_fallback",
+        (this.carrierStrategy.name === "native_fallback" &&
+          this.routingInput.buses?.some(
+            (bus) => bus.skewReference !== undefined,
+          )),
       // Keep the aggregate pipeline budget. Restarting a dense bus at the
       // old per-layer cutoff discards compatible computed alternatives just
       // before they converge. Unconstrained controls retain a work reserve.
