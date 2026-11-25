@@ -1,0 +1,120 @@
+{
+  "sourceCommit": "bb22465eee9ac2c014a4afd9fe2f2421d0ca2eec",
+  "fresh": true,
+  "timeoutSeconds": 3600,
+  "runtime": "Bun 1.4.2 macOS arm64, four independent worker processes",
+  "allImagesReviewed": true,
+  "fullReportSha256": "9b9b424083b2308a882bfcf666faf7886ed6bc3b8ab0301448879dfbc0706a7a",
+  "samples": [
+    {
+      "name": "control",
+      "requested": 47,
+      "complete": true,
+      "matched": true,
+      "drcPassed": true,
+      "fixedPowerTraces": 161,
+      "issues": [],
+      "imageSha256": "9380ec28a29f3931f2dc00555fa3c94d82eff2c16978ab9a391d74b95cafa79e"
+    },
+    {
+      "name": "control-inner1",
+      "requested": 47,
+      "complete": true,
+      "matched": true,
+      "drcPassed": true,
+      "fixedPowerTraces": 161,
+      "issues": [],
+      "imageSha256": "ba72091235b1f472e676fc35a1765f1c7cc758c73f33f4525088468f6f8585b6"
+    },
+    {
+      "name": "right",
+      "requested": 47,
+      "complete": true,
+      "matched": true,
+      "drcPassed": true,
+      "fixedPowerTraces": 161,
+      "issues": [],
+      "imageSha256": "a1b3901b63fe366f647febb8c2d529d3fc8bfbbd3d8f46356798aaa9f9bd7d8c"
+    },
+    {
+      "name": "left",
+      "requested": 47,
+      "complete": true,
+      "matched": true,
+      "drcPassed": true,
+      "fixedPowerTraces": 161,
+      "issues": [],
+      "imageSha256": "e552d950c929731f6b3b6d5ac191ef29b62976dc749e03859b15f96b9fa436a2"
+    },
+    {
+      "name": "above",
+      "requested": 47,
+      "complete": true,
+      "matched": true,
+      "drcPassed": true,
+      "fixedPowerTraces": 161,
+      "issues": [],
+      "imageSha256": "433b76aec5a2d98b94ce844ac12b2f4025b6f560f1b6f9f11823293a810bf66b"
+    },
+    {
+      "name": "inner-layers",
+      "requested": 47,
+      "complete": true,
+      "matched": true,
+      "drcPassed": true,
+      "fixedPowerTraces": 161,
+      "issues": [],
+      "imageSha256": "3f624431b11a1f9b76a734d3a6c6f97fba56a99ecd407c1d29d845af180cf966"
+    },
+    {
+      "name": "inner-layers-right",
+      "requested": 47,
+      "complete": true,
+      "matched": true,
+      "drcPassed": true,
+      "fixedPowerTraces": 161,
+      "issues": [],
+      "imageSha256": "6bc2c235522ee7d517dc293e8610443993a1520d696f93a099b2569ca0d7fd98"
+    },
+    {
+      "name": "inner-layers-left",
+      "requested": 47,
+      "complete": true,
+      "matched": true,
+      "drcPassed": true,
+      "fixedPowerTraces": 161,
+      "issues": [],
+      "imageSha256": "0f7ba6575b3af3d5e699c2e26a54f69912bb2f070f00b297ed3ef6c1b0036b21"
+    },
+    {
+      "name": "inner-layers-above",
+      "requested": 47,
+      "complete": true,
+      "matched": true,
+      "drcPassed": true,
+      "fixedPowerTraces": 161,
+      "issues": [],
+      "imageSha256": "b4c065d3b210f5d857cec33dab07a8e0463dde756195cca141f84edeeba5c330"
+    },
+    {
+      "name": "inner-layers-complete-ca",
+      "requested": 47,
+      "complete": true,
+      "matched": true,
+      "drcPassed": true,
+      "fixedPowerTraces": 161,
+      "issues": [],
+      "imageSha256": "a8bbdb380edb05cb95e35920e15c329ae3706059e6279eb180531df51b39c6e3"
+    },
+    {
+      "name": "outer-layers",
+      "requested": 47,
+      "complete": true,
+      "matched": true,
+      "drcPassed": true,
+      "fixedPowerTraces": 161,
+      "issues": [],
+      "imageSha256": "9296261453d12acf43ffad9bdeaa0df39f13ee1af6db7039b9907f59743a5575"
+    }
+  ]
+}

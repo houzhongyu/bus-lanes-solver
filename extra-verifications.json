@@ -1,0 +1,150 @@
+{
+  "consolidated": {
+    "sample": "h616-ddr-reference",
+    "requestedNets": 53,
+    "connectedNets": 53,
+    "connected": [
+      "/DRAM/DQ0",
+      "/DRAM/DQ1",
+      "/DRAM/DQ10",
+      "/DRAM/DQ11",
+      "/DRAM/DQ12",
+      "/DRAM/DQ13",
+      "/DRAM/DQ14",
+      "/DRAM/DQ15",
+      "/DRAM/DQ2",
+      "/DRAM/DQ3",
+      "/DRAM/DQ4",
+      "/DRAM/DQ5",
+      "/DRAM/DQ6",
+      "/DRAM/DQ7",
+      "/DRAM/DQ8",
+      "/DRAM/DQ9",
+      "/DRAM/SA0",
+      "/DRAM/SA1",
+      "/DRAM/SA10",
+      "/DRAM/SA11",
+      "/DRAM/SA12",
+      "/DRAM/SA13",
+      "/DRAM/SA14",
+      "/DRAM/SA15",
+      "/DRAM/SA2",
+      "/DRAM/SA3",
+      "/DRAM/SA4",
+      "/DRAM/SA5",
+      "/DRAM/SA6",
+      "/DRAM/SA7",
+      "/DRAM/SA8",
+      "/DRAM/SA9",
+      "/DRAM/SBA0",
+      "/DRAM/SBA1",
+      "/DRAM/SBA2",
+      "/DRAM/SCAS",
+      "/DRAM/SCKE0",
+      "/DRAM/SCKE1",
+      "/DRAM/SCKN",
+      "/DRAM/SCKP",
+      "/DRAM/SCS0",
+      "/DRAM/SCS1",
+      "/DRAM/SDQM0",
+      "/DRAM/SDQM1",
+      "/DRAM/SDQS0N",
+      "/DRAM/SDQS0P",
+      "/DRAM/SDQS1N",
+      "/DRAM/SDQS1P",
+      "/DRAM/SODT0",
+      "/DRAM/SODT1",
+      "/DRAM/SRAS",
+      "/DRAM/SRST",
+      "/DRAM/SWE"
+    ],
+    "disconnected": [],
+    "groups": {
+      "byte0": {
+        "requested": 8,
+        "connected": 8
+      },
+      "byte1": {
+        "requested": 8,
+        "connected": 8
+      },
+      "remaining": {
+        "requested": 37,
+        "connected": 37
+      }
+    },
+    "membershipErrors": [],
+    "components": 4,
+    "expectedComponents": 4,
+    "pads": 384,
+    "expectedPads": 384,
+    "traces": 57,
+    "vias": 96,
+    "wireLengthMm": 707.6801338630715,
+    "copperPours": 0,
+    "drc": {
+      "overlap": 0,
+      "padTrace": 0,
+      "viaTrace": 0,
+      "viaPad": 0,
+      "viaSpacing": 0,
+      "continuity": 0,
+      "viaInPad": 0,
+      "holeTrace": 0,
+      "width": 0
+    },
+    "connectivityPolicy": "Continuity through emitted traces, physical via spans and actual same-net pour polygons; singleton nets and diagnostic partials do not count as completed requests.",
+    "extra": {
+      "sameNetViaSpacing": 0,
+      "routingConstraints": 3,
+      "widthWarnings": 0,
+      "style": 0,
+      "selfShorts": 0,
+      "missing": 0,
+      "unconnectedPorts": 0,
+      "boardEdge": 0
+    },
+    "passed": false,
+    "generalRoutingFindings": [
+      {
+        "type": "pcb_bus_routing_constraint_warning",
+        "pcb_bus_routing_constraint_warning_id": "pcb_bus_routing_constraint_warning_source_bus_3_0",
+        "warning_type": "pcb_bus_routing_constraint_warning",
+        "source_bus_id": "source_bus_3",
+        "source_trace_ids": [
+          "source_trace_0"
+        ],
+        "pcb_trace_ids": [],
+        "message": "Unverified bus U2 byte0 DQ/DM to DQS (original matching): a signal lacks complete, unbranched pad-to-pad geometry",
+        "subcircuit_id": "subcircuit_source_group_0",
+        "routing_rule": "route_geometry"
+      },
+      {
+        "type": "pcb_bus_routing_constraint_warning",
+        "pcb_bus_routing_constraint_warning_id": "pcb_bus_routing_constraint_warning_source_bus_5_1",
+        "warning_type": "pcb_bus_routing_constraint_warning",
+        "source_bus_id": "source_bus_5",
+        "source_trace_ids": [
+          "source_trace_28"
+        ],
+        "pcb_trace_ids": [],
+        "message": "Unverified bus U2 byte1 DQ/DM to DQS (original matching): a signal lacks complete, unbranched pad-to-pad geometry",
+        "subcircuit_id": "subcircuit_source_group_0",
+        "routing_rule": "route_geometry"
+      },
+      {
+        "type": "pcb_bus_routing_constraint_warning",
+        "pcb_bus_routing_constraint_warning_id": "pcb_bus_routing_constraint_warning_source_bus_8_2",
+        "warning_type": "pcb_bus_routing_constraint_warning",
+        "source_bus_id": "source_bus_8",
+        "source_trace_ids": [
+          "source_trace_32"
+        ],
+        "pcb_trace_ids": [],
+        "message": "Unverified bus U2 address/command to CK (original matching): a signal lacks complete, unbranched pad-to-pad geometry",
+        "subcircuit_id": "subcircuit_source_group_0",
+        "routing_rule": "route_geometry"
+      }
+    ]
+  }
+}

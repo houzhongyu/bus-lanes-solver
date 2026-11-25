@@ -1,414 +1,48 @@
-# @tscircuit/bus-lanes-solver
+The combined H616 fix is `bb22465eee9ac2c014a4afd9fe2f2421d0ca2eec`, one commit above repro `50e1d0e779e3bb7766dd04677cdee9bcfc440712`; the repro is one commit above main `69e2159483e062013728cd8ff256f9343224a90b`. No PR is merged.
 
-## Installation
+The fresh normal-Core run uses the built `dist/index.js` package through Core's existing native worker. Routing and matching share 120 seconds. It starts with no copper and finishes 53/53 signals, all nine hard skew checks and all six preservation checks, with zero physical DRC findings or geometry changes. Total local routing/matching wall time is 56.4 seconds on macOS arm64, Bun 1.4.2. This is not a speed comparison with Linux CI. Source and dependency pins are in [provenance.json](provenance.json); the unmodified native output is [h616-circuit.json.gz](h616-circuit.json.gz), with [measurements](h616.json).
 
-Releases are published to GitHub Packages and served publicly through jscdn:
+| Original rule | Actual mm | Limit mm | Result |
+| --- | ---: | ---: | --- |
+| ADDR_LEN | 6.350000 | 6.35 | met |
+| L_BYTE_LANE_LEN | 2.540000 | 2.54 | met |
+| H_BYTE_LANE_LEN | 2.418145 | 2.54 | met |
+| U2 byte0 DQ/DM to DQS (original matching) | 3.683061 | 7.546898 | met |
+| U2 DQS0 pair (original matching) | 0.359684 | 0.359685 | met |
+| U2 byte1 DQ/DM to DQS (original matching) | 5.381748 | 5.381748 | met |
+| U2 DQS1 pair (original matching) | 0.427305 | 2.615682 | met |
+| U2 clock pair (original matching) | 0.096628 | 0.096629 | met |
+| U2 address/command to CK (original matching) | 13.375053 | 15.907342 | met |
 
-```sh
-bun add https://jscdn.tscircuit.com/@tscircuit/bus-lanes-solver/latest.tgz
-```
+Mean rules measure the greatest deviation from the actual class mean; reference rules compare each subject with every specified reference; pair rules measure the selected controller-to-memory path, excluding termination branches. Original rule memberships, limits, widths, placement, clearance and via-in-pad restrictions are unchanged. The independent native regression also checks these rules from empty copper.
 
-Pin the resolved release version in your dependency URL for reproducible installs.
-The release contains bundled JavaScript and TypeScript declarations in `dist`;
-Git checkouts, test fixtures, examples, and development dependencies are excluded.
+The unfiltered [additional checker output](extra-verifications.json) retains the same three general unverified-geometry warnings as the earlier implementation. Its broad `passed` flag therefore remains false. Those warnings are deferred by the user; all physical finding categories are zero, and the independent hard-skew assessment passes. No warning suppression is included in the production fix.
 
-Run `bun run test:package` to build and validate the actual tarball in an isolated
-consumer before publishing.
+![Completed H616 native copper](h616-normal-core.pcb.png)
 
-Step-based, via-free bus routing for `SimpleRouteJson`, with `BaseSolver` and `GenericSolverDebugger` from `@tscircuit/solver-utils`.
+The eleven AM3352 images below were regenerated from separate fresh solves of the final consolidated code, with a 3,600-second per-case budget and four local worker processes. Every output passed connectivity, DRC, matching/coupling and preservation of the 161 fixed power dogbones before rendering. Every individual image was inspected. All twelve PNGs, including the contact sheet, are byte-identical to the earlier reviewed gallery. See [validation summary](gallery-validation.json) and [complete validation reports](gallery-validation-full.json.gz). This is fresh solving, not saved-route revalidation.
 
-```ts
-import { BusLanesSolver } from "@tscircuit/bus-lanes-solver"
+![All eleven completed AM3352 samples](am3352/contact-sheet.png)
 
-const solver = new BusLanesSolver(simpleRouteJson)
-solver.solve()
-if (solver.failed) throw new Error(solver.error!)
-const routed = solver.getOutput()
-```
+- [control](am3352/control.png)
+- [control-inner1](am3352/control-inner1.png)
+- [right](am3352/right.png)
+- [left](am3352/left.png)
+- [above](am3352/above.png)
+- [inner-layers](am3352/inner-layers.png)
+- [inner-layers-right](am3352/inner-layers-right.png)
+- [inner-layers-left](am3352/inner-layers-left.png)
+- [inner-layers-above](am3352/inner-layers-above.png)
+- [inner-layers-complete-ca](am3352/inner-layers-complete-ca.png)
+- [outer-layers](am3352/outer-layers.png)
 
-The `BusLanesSolver` core requires exactly two terminals on the same fixed layer and emits a planar carrier without vias. The integrated pipeline composes this core with owned terminal escapes and can add manufactured surface transitions for explicit TOP/BOTTOM inputs. Existing copper and obstacles remain fixed. Geometric winding sweeps, seam rotations and reverse searches choose lane order; planar congestion, crossed lane orders, unsupported constraints, and exhausted search budgets produce explicit failures. A bounded visibility-graph search failure is not a proof that no continuous planar solution exists.
+Final-revision paired Blacksmith reports are retained in the linked workflow artifacts. Every pair uses Bun 1.4.0, Linux x64 on a Blacksmith 4-vCPU runner, a pinned base harness, identical fixtures and a 3,600-second per-solver/sample budget.
 
-## Matched single-layer routing
+- [Repro/main comparison](https://github.com/tscircuit/bus-lanes-solver/actions/runs/45563262527): main `69e2159` against repro `50e1d0e`.
+- [Combined fix comparison](https://github.com/tscircuit/bus-lanes-solver/actions/runs/45562507619): repro `50e1d0e` against fix `bb22465`.
 
-The `control-inner1` AM3352 sample uses the pipeline's default matched goal.
-Supply the native power connections so the independent copper checker retains
-ownership of immutable fanouts:
+To reproduce the native checks in the solver checkout, install dependencies, run `bun run test:package`, and run `bun test tests/h616-reference-skew.test.ts tests/h616-completed-clock-reference.test.ts tests/mean-reference-skew.test.ts`. The paired CI command is `bun base/scripts/pr-benchmark/run-pair.ts --sample SAMPLE --timeout-seconds 3600 --main base/lib/index.ts --pr head/lib/index.ts --main-sha BASE_SHA --pr-sha HEAD_SHA --controller-sha BASE_SHA --output results/SAMPLE.json`, for every sample in the base revision's `scripts/pr-benchmark/samples.json`. It invokes the same worker as `./benchmark.sh --worker SAMPLE --solver SOLVER_PATH --timeout-seconds 3600`. Fresh local gallery captures additionally pass `--routes-directory DIR`.
 
-```ts
-const solver = new BusLanesPipelineSolver(input, {
-  singleCarrier: { fixedConnections: metadata.powerConnections },
-})
-solver.solve()
-if (!solver.solved) throw Error(solver.error ?? "Routing failed")
-const output = solver.getOutput()
-```
+For the normal-Core comparison, use the source/dependency pins in provenance, bind the built solver package as Core's `@tscircuit/bus-lanes-solver` dependency, then run `bun BENCHMARK/scripts/run.ts --core CORE --circuit h616 --timeout 120 --out NEW_OUTPUT_DIRECTORY`. The benchmark uses the public Core circuit and native routing pipeline; no custom autorouter adapter is involved.
 
-The native search routes owned TOP escapes and a single `inner1` carrier,
-checks both plated via lands on every physical copper plane, and matches the
-whole pad-to-pad signal length. Paired backbones remain physically coupled;
-ordinary signals and their timing banks negotiate with controls. Fine-grid
-repairs can free neighboring package exits when a local conflict cannot be
-resolved independently. A provisional connected or unmatched state is never
-accepted as solved.
-
-Run `bun scripts/route-control-inner1.ts` for a fresh solve and independently
-audited output in `work/control-inner1`. The command writes artifacts only
-after complete connectivity, native DRC, length matching and coupling pass.
-`./benchmark.sh --require-all-solved --routes-directory work/benchmark-routes`
-retains only successfully audited routes for snapshot export.
-
-## Connectivity-only mode
-
-The powered AM3352 control can route all 47 signals on `inner1` using the
-pipeline's explicit connectivity goal:
-
-```ts
-const solver = new BusLanesPipelineSolver(
-  { ...input, allowedLayers: ["inner1"] },
-  {
-    goal: "connectivity",
-    connectivity: { fixedConnections: metadata.powerConnections },
-  },
-)
-solver.solve()
-if (!solver.solved) throw Error(solver.error ?? "Routing failed")
-const output = solver.getOutput()
-```
-
-This goal negotiates top-layer package escapes and the single carrier together,
-adds two plated signal vias per connection, preserves supplied fixed copper,
-and accepts only complete connectivity with zero copper DRC issues. The
-`fixedConnections` records identify existing copper that is not a new routing
-request. It supports uniform-width, two-terminal top-layer package pads and
-rectangular board bounds.
-
-**Connectivity is a separate stage, not DDR acceptance.** It retains the input's
-bus and pair constraints but does not enforce length matching, pair coupling or
-ordinary-corner refinement. The default `goal: "matched"` and the matched
-snapshot exporter keep their existing acceptance rules.
-
-See [the matched control result](docs/control-inner1/README.md).
-
-## Review target
-
-The integrated preset routes the original TSX from the
-[AM3352/RAM reference](https://tscircuit.com/seveibar/am3352-ram-dogbone-and-single-layer-route-test)
-with its custom algorithms replaced by `autorouter="bus_lanes"` in
-[core #4237](https://github.com/tscircuit/core/pull/4237). All 47 signals are computed
-from pads, obstacles, and constraints. No saved route plan is replayed.
-
-![Completed AM3352 routing across all three signal layers](docs/routed-am3352/solved.png)
-
-Acceptance requires zero DRC errors, planar carriers with valid owned escapes,
-short ordinary runs with few direction changes, no self-touching copper or acute
-reversals, smooth length-tuning curves, coupled pair shapes, and the declared bus
-and pair skew limits. The separate AM62L DDR benchmarks alone do not establish
-this AM3352 result.
-
-The separate core AM3352 regression measures these limits independently of the solver:
-
-| Measurement | Reviewed reference | Generated result | Regression limit |
-| --- | ---: | ---: | ---: |
-| Connected signals / native DRC errors | 47 / 0 | 47 / 0 | 47 / 0 |
-| Total planar copper | 1696.53 mm | 1549.71 mm | ≤1700 mm |
-| Maximum / mean detour ratio | 2.536 / 1.723 | 2.047 / 1.546 | ≤2.6 / ≤1.75 |
-| Ordinary turns / short jogs | 888 / 451 | 540 / 145 | ≤900 / ≤460 |
-| Acute corners | — | 0 | 0 |
-| Byte-bus / maximum differential skew | Within declared bounds | 0.635 / 0.127 mm | ≤0.635 / ≤0.127 mm |
-| Pair interior edge gap | 0.11979–0.13813 mm | 0.11213–0.13813 mm | 0.0999–0.155 mm |
-
-The original reference audit allows 6.2 mm at each end for package approaches.
-The powered placement benchmark below additionally audits all copper outside
-native package/fanout regions, including the approaches.
-The quality limits supplement connectivity, continuous DRC, and visual review.
-
-The main review path is:
-
-1. `bus-lanes-pipeline-solver.ts`: preserve existing fanouts; escape only untouched
-   component pads; compose the routing and tuning stages.
-2. `bus-lanes-solver.ts`: complete fixed-layer connections and validate the result.
-3. `coupled-pair-routing.ts` and `tune-coupled-lengths.ts`: shared pair corridors
-   and shared smooth meanders.
-4. `refine-pair-approaches.ts`: tighten parallel approaches, replace acute
-   corners with legal bevels, and continue shared pair geometry through bends.
-   Refinement runs after allocating tuning space and preserves other-net copper.
-5. The AM3352 TSX regression in core: 47 routes, native DRC, independent quality
-   measurements, and three routed signal-layer snapshots. The placement
-   benchmark below reports the current eleven-case runtimes.
-
-## Constraints
-
-- `buses[].connectionNames`: connections belonging to the bus, in routing order.
-- `buses[].maxLengthSkew`: maximum difference in total planar copper lengths, in millimeters, including fixed traces associated by `source_trace_id` or `connection_name`. The solver adds clearance-checked tuning detours and verifies the final result.
-- `buses[].traceWidth`: explicit width in millimeters; otherwise uses connection `nominalTraceWidth` / `width`, then `minTraceWidth`.
-- `buses[].allowedLayers`: must contain the fixed terminal layer.
-- `differentialPairs[].lengthTolerance`: supported as a routed-length constraint. Pairs with `traceGap` use a shared corridor. An explicit `maxUncoupledLength` bounds total uncoupled copper, including fixed fanouts.
-
-Matching includes both fixed fanouts and the routes produced by this phase. It measures XY copper length; via depth, layer-dependent propagation velocity, and package delays are not inferred. No impedance or delay defaults are supplied. Matching uses the existing core SRJ fields: bus `maxLengthSkew` and differential-pair `lengthTolerance` (mapped from the JSX pair’s `maxLengthSkew`). Routes already inside the bound remain untuned; shorter routes grow only to the permitted lower bound. Overlapping bus and pair constraints are resolved together without forcing exact equality.
-
-## tscircuit integration
-
-The accompanying core/props changes introduce:
-
-```tsx
-<autoroutingphase name="DATA_LANES" phaseIndex={1} autorouter="bus_lanes" />
-<bus
-  name="DATA"
-  connections={["DATA0", "DATA1"]}
-  routingPhaseIndex={1}
-  maxLengthSkew="0.1mm"
-  pcbTraceWidth="0.15mm"
-/>
-```
-
-The integrated phase adds local dogbones only for untouched component pads that need a signal-layer transition. Existing fanout handoffs retain their layers and geometry. Failed lane routing does not trigger a global-router fallback.
-
-## Debugger
-
-```sh
-bun install
-bun run start
-bun run build:site
-```
-
-Cosmos shows four full AM62L DDR phase captures and a skew-tolerance example.
-Each AM62L page has two separate, real `FanoutSolver` outputs and all 33 DDR
-signals waiting to be routed. The enclosing regions are 17.76 mm apart, with a
-4 mm transverse package offset. Fixed and newly routed copper share stable
-layer colors; all layers are present at iteration zero, including via rings.
-The SoC remains unrotated.
-
-```sh
-bun test
-bun run typecheck
-./benchmark.sh
-bun run format:check
-```
-
-Normal tests retain fast routing smoke cases, visual snapshots, and focused
-geometry, DRC, matching, and fanout-provenance regressions. Full AM3352 routing
-searches run on demand: comment `/benchmark` on an open PR to compare main and
-the PR, including completion and P50/P80/P90/P95 times. See
-[PR benchmarks](docs/pr-benchmarks.md) for the report and timeout options.
-
-The repository follows the [handbook bootstrapping guide](https://github.com/tscircuit/handbook/blob/main/guides/bootstrapping-repos.md): Bun, vanilla TypeScript package exports, Biome, CI and a Vite/React Cosmos site. `vercel.json` exports Cosmos for deployment.
-
-## AM3352 placement benchmark
-
-`./benchmark.sh` runs eleven AM3352/RAM samples. The AM3352 stays at
-(0, 0) mm, and only the RAM is translated; both chips retain their orientation.
-Board coordinates use +X right and +Y up.
-
-| Sample | RAM center (mm) | Carrier layers |
-| --- | --- | --- |
-| Original control | (0, -27) | Automatic |
-| Single inner1 control | (0, -27) | inner1 |
-| Right | (27, 0) | Automatic |
-| Left | (-27, 0) | Automatic |
-| Above | (0, 27) | Automatic |
-| Inner layers below | (0, -27) | inner1, inner2 |
-| Inner layers right | (27, 0) | inner1, inner2 |
-| Inner layers left | (-27, 0) | inner1, inner2 |
-| Inner layers above | (0, 27) | inner1, inner2 |
-| Inner layers with complete CA/clock bus | (0, -27) | inner1, inner2 |
-| Outer layers below (control) | (0, -27) | top, bottom |
-
-The inner-layer samples set `input.allowedLayers = ["inner1", "inner2"]`
-on the corresponding placement geometry. This restricts all signal carriers, including
-clock and control signals, during allocation and congestion retries. The board
-still has four physical copper layers: top-pad dogbones and through-via barrels
-remain physical obstacles; all 161 supplied power dogbones stay immutable.
-Global `allowedLayers` intersects each bus's `allowedLayers`; an incompatible
-existing fanout handoff is rejected rather than dogboned again.
-
-The `outer-layers` sample routes the RAM-below control at (0, -27) mm with
-`input.allowedLayers = ["top", "bottom"]`. Every signal wire uses one of those
-two outer planes, leaving inner1 and inner2 available for GND planes. The board
-retains its four-layer stackup and through-via barrels, so plane clearances still
-apply around those barrels. This sample does not create ground planes or change
-the reference power-plane connectivity.
-
-For explicit surface-layer inputs, the pipeline reserves matched byte buses and
-coupled differential pairs before negotiating unrelated controls. It can tune
-an owned TOP approach when a short BOTTOM carrier has no room for a meander.
-Computed control routes are rechecked against the complete timing copper.
-Bounded conflict repairs retain valid existing routes and revisit solver-owned
-carrier and escape choices. Untimed controls can use up to four
-manufactured through-vias to pass both package exit obstructions. The core
-matcher still receives a single-plane carrier; its owned approaches retain the
-other transitions. These choices come from geometry and declared bus/pair
-membership, without sample names or saved routes.
-
-The [fixture loader](scripts/am3352-samples.ts) uses one native core phase
-capture, the original 47 DDR signal connections, two byte buses, and three
-differential pairs. The complete-CA sample also matches the 24-signal
-address/control/clock bus. Signal routes are computed from the pads every run.
-Only RAM pads, terminals, and their associated fixed power geometry move.
-The older AM62L examples remain separate regression fixtures; the benchmark
-does not run those cases, mixed-layer negatives, or carrier-prefix samples.
-
-Before signal routing, both chips' supply and ground pads have immutable local
-dogbones generated by `FanoutSolver`. Their wire copper and through-via barrels
-are supplied in `input.traces`, so signal dogboning, lane search, and validation
-all see them as obstacles. CPU voltage domains remain separate. The three
-`CAP_VDD_*` outputs and `VDD_MPU_MON` each retain their own identity; this study
-adds local escapes without defining power-plane connectivity. Coverage is
-161 pads: 122 on the AM3352 and 39 on RAM, including the reference's ground ties
-for `VREFN`, `RTC_KALDO_ENn`, and `VPP`. Input/options/output records and
-pad ownership are saved in [the fixture directory](tests/fixtures/am3352-ram).
-
-The benchmark checks fixed fanout provenance, exact pad joins, complete power
-coverage, and fixed-copper DRC before routing. A completed sample additionally
-requires all 47 exact native pad joins, unchanged power copper, permitted signal
-wire layers, valid full-stack manufactured via spans and drill spacing,
-combined-copper DRC, self-clearance, conventional angles, byte-bus skew within
-0.635 mm, and differential-pair skew within 0.127 mm. Exterior pair coupling is
-also checked along the complete joined copper. Matching measures full pad-to-pad
-XY copper, including every owned escape and approach; via depth is not inferred.
-
-Each sample runs in a fresh process, serially, with a default 3600-second routing budget.
-All eleven cases are always
-attempted and their results written to `benchmark-results.json`. Failed searches
-and timeouts are failures in the completion score. By default the command records
-these measured outcomes and exits nonzero for invalid fixtures, worker crashes,
-or invalid completed copper. Use `./benchmark.sh --require-all-solved` for a
-strict gate that also exits nonzero when any sample remains unrouted. The
-on-demand `/benchmark` workflow runs the same eleven placements for both main
-and the PR and uploads paired JSON reports and worker logs. These long searches
-are excluded from ordinary push and pull-request CI.
-
-The published reference benchmark completed **11/11** samples at a 3600-second
-routing budget. The fresh single-inner1 control takes 1906.120 seconds, including
-matching. Full runtimes, carrier counts and per-bus/pair copper skews are recorded
-in [the verified eleven-sample report](docs/routed-am3352-placements/README.md).
-
-Every completed case preserves all 161 supplied power dogbones and their
-`FanoutSolver` provenance. Native combined-copper DRC, full-copper bus and pair
-matching, exterior coupling, self-clearance, and conventional-angle checks are
-required for a pass. Runtime varies by machine. Completed review images and the
-full measurements are in [the placement report](docs/routed-am3352-placements).
-
-When jointly planned pair corridors share a layer, the pipeline first tries
-control routing at the existing dogbone sites. It rematches fresh sites only
-after a failed routing attempt, retaining the complete validation checks.
-
-When a standalone pair shares a carrier layer with a matched bus, the pipeline
-matches the independent buses first, places the standalone pair as coupled rails,
-then checks control-site reachability against that completed copper. The below inner-
-layer sample routes 24 signals on inner1 and 23 on inner2, with no signal carriers
-on top or bottom. Its byte skews are 0.635 mm and pair skews stay below 0.127 mm.
-
-For backward-facing packages, the pipeline routes shared pair corridors and
-repairs a nearly complete bus together with its newly generated local signal
-sites. Native supplied copper remains hard throughout. Package coupling is
-extended while preserving already matched internal compensation, then the bus
-and pair lengths are revalidated without raising the bus length target.
-
-Generate completed review images for every declared sample with
-`bun scripts/snapshot-routed-am3352.ts docs/routed-am3352-placements 3600`.
-The exporter validates all eleven before writing any images and shows all physical
-copper planes, including owned terminal escapes. It refuses partial
-or unrouted results. Inspect every generated image before including the
-[completed snapshots](docs/routed-am3352-placements/README.md) in a pull request.
-
-The router checks continuous copper clearance while searching octilinear paths.
-Clear channels use analytic connectors. Dense inputs use a grid search with turn
-penalties, negotiated congestion, geometry-derived waypoint alternatives, and
-bounded candidate selection. Candidate pairs remain atomic. Search never loads a
-saved route plan; package envelopes, bus membership, and existing copper determine
-the alternatives. Bus corridors are routed and tuned before unrelated controls.
-A search-budget failure is explicit and does not export partial successful routes.
-
-See the [visual iteration audit](./docs/vector-routing.md) for inspected baseline
-and replacement snapshots. Cosmos includes a staggered obstacle channel in
-addition to all four real AM62L captures.
-
-Future changes must be submitted through pull requests with inspected completed snapshots for every declared AM3352 sample. See [AGENTS.md](./AGENTS.md).
-
-### Meander geometry
-
-The integrated matcher packs rounded meanders into narrow banks before trying
-wider corridors. Cell count comes from the usable run length and minimum bend
-radius; paired curves include both rail offsets when calculating that radius.
-This spends available longitudinal space on more cells, reducing transverse
-excursion without tightening bend radii or separating pairs. Existing fanouts
-remain fixed, and wider candidates remain available when compact packing fails.
-
-Length tuning prioritizes long runs over short terminal approaches and centers evenly pitched serpentine lobes along them. The integrated preset uses rounded curves for both individual lanes and shared pair centerlines. Lobe count scales with the required added length, spreading large corrections without turning small corrections into dense teeth. Chamfers scale with lobe dimensions instead of a fixed microscopic corner cut. Returning arms retain at least three trace widths of center-to-center spacing (and the requested copper clearance). When the shortest lanes leave no room, the router opens an octilinear central corridor in winding order and rematches all affected bus lengths. Endpoints and fixed fanouts remain unchanged.
-
-The [routed artifacts](./docs/routed-ddr) contain complete boards. All new carrier bends in the DDR samples are checked to turn by at most 45 degrees; length matching and combined-copper DRC remain mandatory.
-
-### Envelope compaction
-
-After accepting a complete route, the pipeline makes bounded linear compaction
-proposals. It first preserves matched lengths, then tries coordinated shortening
-within the declared bus/pair skew and absolute length bounds. These measurements
-include immutable fanout copper. Nearby differential rails move together;
-endpoints, vias and supplied fanouts stay fixed.
-
-Flexible tuning banks retain the shape and radius of each sampled bend while
-allowing the straight legs between bends to contract. Collision constraints
-retain the original separating sides of copper obstacles. Redundant constraints
-are removed geometrically to bound the linear solver's memory use.
-
-For routing restricted to inner layers, a final search compacts each matching
-bus and its paired rails while holding the other carriers fixed. Shrinking an
-interior group can make room for the next outer group. This search runs only
-when a constrained signal supports the outer envelope, makes at most four
-sweeps, and stops when a full sweep improves the envelope by less than 0.1%.
-Straight-edge projection corrects simplex rounding before the unchanged route
-checks; fixed endpoints and sampled bend shapes remain intact.
-
-Every published improvement must reduce the actual signal copper envelope and pass
-the existing carrier, self-clearance, angle, terminal-via, length and coupling
-checks. Coordinated proposals may trade width for height when total area falls.
-The initial neighborhoods start from the conservative result; the inner-layer
-group search follows the best result. The pipeline keeps the best validated route. An interrupted, oversized or unsuccessful optimization retains
-that accepted route. The benchmark reports before/after area and optimization
-time, including the additional group-search time when applicable. See the
-[inner-layer compaction report](docs/inner-layer-compaction/README.md) for the
-comparison against merged PR #38 and complete routed snapshots. The earlier
-[further compaction report](docs/envelope-compaction-further/README.md) records
-measurements against v0.0.19.
-
-## Integrated local-dogbone pipeline (experimental)
-
-`BusLanesPipelineSolver(input, { fanout: "auto" })` composes local terminal
-escapes with the fixed-layer lane solver. Automatic escapes are only eligible at
-component pads without an existing connected route. Supplied fanout handoffs
-retain their available layers and fixed copper; a layer conflict fails rather
-than adding another dogbone. This distinguishes bus completion from the preceding fanout phase.
-
-It honors bus layer restrictions and
-preferences, keeps overlapping bus/pair groups atomic, and resolves signal layers before routing the interconnects. `fanout: "none"`
-retains the fixed-layer input contract. A failed pipeline emits no partial
-successful trace output.
-
-The pipeline enables smooth length tuning and dense routing search. Declared
-pairs use a common corridor and shared tuning curves; skew checks include fixed
-fanout copper. Ordinary-run cleanup minimizes turns without increasing length.
-The strict `BusLanesSolver` export remains available for callers that already
-supply fanout handoffs.
-
-The AM3352/RAM integration computes routes from native pads without saved
-geometry or a custom sample algorithm. Explicit TOP/BOTTOM inputs use the
-surface-routing stages described above; the strict fixed-layer core contract
-remains unchanged. Bounded search reports failure when it cannot find a complete
-acceptable route set. See the eleven-sample benchmark for measured runtimes.
-
-### Routed PR artifacts
-
-PR images show completed routing only. The AM3352 overview above is rendered
-from the three core acceptance snapshots: 16 inner1, 18 inner2, and 13 bottom
-signals. Each panel shows its signal layer, with all 47 routes accounted for.
-The core test writes snapshots only after connectivity, DRC, and quality checks.
-
-Generate the four DDR artifacts with
-`bun scripts/snapshot-routed-ddr.ts`; it verifies all cases solve and every
-connection has a route before writing any images. Keep intermediate and failed
-captures outside the repository.
-
-- [Bottom to top](docs/routed-ddr/ddr_bottom_io_top-solved.png)
-- [Left to right](docs/routed-ddr/ddr_left_io_right-solved.png)
-- [Right to left](docs/routed-ddr/ddr_right_io_left-solved.png)
-- [Top to bottom](docs/routed-ddr/ddr_top_io_bottom-solved.png)
+Scope is the original 53-net DDR fixture. The separate 121-net whole-board reproduction is not timing-qualified.

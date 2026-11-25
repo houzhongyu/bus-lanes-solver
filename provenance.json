@@ -1,0 +1,30 @@
+{
+  "pins": {
+    "bus_base": "69e2159483e062013728cd8ff256f9343224a90b",
+    "bus_247": "f7a028e56698af49ae85c5ccfe01557177d7822d",
+    "bus_integration": "bb22465eee9ac2c014a4afd9fe2f2421d0ca2eec",
+    "core": "be8e884a93a73025065c42c226498cff87afabcd",
+    "benchmark": "76aee0aa3ad95287be72e3ad336425243a4c969d",
+    "props_preview": "901d603",
+    "circuit_json_preview": "5c7810c"
+  },
+  "archives_sha256": {
+    "bus-1df038d.tar.gz": "81c5e6b2a6d551f9f4647cac1786434514cfd235ecb028473c981d98d1b2837d",
+    "bus-247.tar.gz": "b5fff56f871fa6a1346a38fca4b8177c0d0c87f4534c63649a0fa69658a048d4",
+    "core-be8e884.tar.gz": "23aeefc34beaad00d2f9cfef69acaf882a5225ab97cadfe2e93fe75b4ab845f3",
+    "benchmark-76aee0a.tar.gz": "d284bd866cc2b90ad355e442c4cc91bb8396f4688b0f2dd1a0d2e76176d412f4",
+    "props-901d603.tgz": "7133919a8e1fefdb539594b04798483d257fef9332e9b24ea5e85665f77f9d7e",
+    "circuit-json-5c7810c.tgz": "0dc540d2cefb0aa4872536593127b56ededd32e97251e3192d95c3afc2270aaf",
+    "bus-base.tar.gz": "283b49a83b487254c6814f72ef475489dfc038df8aa16eda9a43617d72db18cb"
+  },
+  "platform": "macOS-26.5-arm64-arm-64bit",
+  "machine": "arm64",
+  "bun": "1.4.2",
+  "budgetSeconds": 120,
+  "scope": "53-net H616 DDR source benchmark; normal Core native board; no custom autorouter adapter",
+  "fixed": "Normal Core and benchmark source pinned as recorded, standard routing/matching attempts share a 120-second budget, all 53 signals start with no copper.",
+  "dependency_source": "Read-only installed dependencies from ru/work/core, exact props and circuit-json previews overlaid; bus solver source bound locally. Same binding mechanism in every run.",
+  "packageEntry": "dist/index.js",
+  "h616Command": "bun work/consolidated-ddr/run-core.ts",
+  "h616Output": "core-h616/matching/circuit.json"
+}

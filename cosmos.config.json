@@ -1,5 +1,0 @@
-{
-  "plugins": ["react-cosmos-plugin-vite"],
-  "fixtureFileSuffix": "page",
-  "exportPath": "cosmos-export"
-}
