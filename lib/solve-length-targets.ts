@@ -85,5 +85,39 @@ export function solveLengthTargets({
   if (solution.status !== "optimal") {
     throw Error("Length matching constraints have no feasible targets")
   }
-  return new Map(solution.variables)
+  // Several equally short solutions can put all added length on one lane.
+  // Keep the minimum total copper, then minimize the largest correction so
+  // a single crowded lane does not have to fit the entire tuning bank.
+  const totalBound = nextBoundId++
+  bounds.set(totalBound, { max: solution.result + 1e-7 })
+  const maximumAddedLength = Symbol("maximum added length")
+  const balancedVariables = new Map<
+    ConnectionName | typeof maximumAddedLength,
+    Map<LengthBoundId, number>
+  >(variables)
+  const maximum = new Map<LengthBoundId, number>([[objective, 1]])
+  for (const [name, coefficients] of variables) {
+    coefficients.set(objective, 0)
+    coefficients.set(totalBound, 1)
+    if (!input.connections.some((connection) => connection.name === name))
+      continue
+    const bound = nextBoundId++
+    bounds.set(bound, { max: targets.get(name)! })
+    coefficients.set(bound, 1)
+    maximum.set(bound, -1)
+  }
+  balancedVariables.set(maximumAddedLength, maximum)
+  const balanced = solve({
+    direction: "minimize",
+    objective,
+    constraints: bounds,
+    variables: balancedVariables,
+  })
+  if (balanced.status !== "optimal")
+    throw Error("Length matching constraints have no balanced targets")
+  const result = new Map(targets)
+  for (const [name, value] of balanced.variables) {
+    if (typeof name === "string") result.set(name, value)
+  }
+  return result
 }

@@ -1323,10 +1323,6 @@ export class BusLanesPipelineSolver extends BaseSolver {
         this.childOptions(),
         terminalLayers,
       )
-    // Preserve successful allocations, while reserving aggregate work for
-    // movable sites if these provisional fixed approaches cannot route.
-    if (this.canNegotiateGeneratedSites)
-      this.child.MAX_ITERATIONS = Math.min(this.child.MAX_ITERATIONS, 12000)
   }
   _step() {
     if (performance.now() >= this.routingDeadline) {

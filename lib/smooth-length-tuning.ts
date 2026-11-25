@@ -349,7 +349,7 @@ export function tuneSmoothLengths(
     if (!changed && !allowPartial) {
       allowPartial = true
       changed = true
-    } else if (!changed && !allowFolded && options.packMeanders) {
+    } else if (!changed && !allowFolded) {
       // Preserve all ordinary and partial-bank solutions before trying folded
       // pockets. Their separate bounded budget cannot starve package tuning.
       allowFolded = true

@@ -62,4 +62,6 @@ test("a two-tolerance range does not imply matching to the actual mean", () => {
     12,
     6,
   )
+  expect(minimumLengthTargets(input, traces).get("a")).toBeCloseTo(2.5, 6)
+  expect(minimumLengthTargets(input, traces).get("b")).toBeCloseTo(2.5, 6)
 })
