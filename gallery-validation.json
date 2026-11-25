@@ -1,0 +1,96 @@
+{
+  "sourceCommit": "f7a028e56698af49ae85c5ccfe01557177d7822d",
+  "freshLocalSolves": true,
+  "allElevenValidatedBeforeRendering": true,
+  "inspection": "All 11 images inspected in contact sheet; dense single-carrier, outer-layer and complete-CA views inspected at full resolution.",
+  "samples": [
+    {
+      "name": "control",
+      "connected": 47,
+      "connectivity": true,
+      "matched": true,
+      "drc": true,
+      "fixedPowerDogbones": 161
+    },
+    {
+      "name": "control-inner1",
+      "connected": 47,
+      "connectivity": true,
+      "matched": true,
+      "drc": true,
+      "fixedPowerDogbones": 161
+    },
+    {
+      "name": "right",
+      "connected": 47,
+      "connectivity": true,
+      "matched": true,
+      "drc": true,
+      "fixedPowerDogbones": 161
+    },
+    {
+      "name": "left",
+      "connected": 47,
+      "connectivity": true,
+      "matched": true,
+      "drc": true,
+      "fixedPowerDogbones": 161
+    },
+    {
+      "name": "above",
+      "connected": 47,
+      "connectivity": true,
+      "matched": true,
+      "drc": true,
+      "fixedPowerDogbones": 161
+    },
+    {
+      "name": "inner-layers",
+      "connected": 47,
+      "connectivity": true,
+      "matched": true,
+      "drc": true,
+      "fixedPowerDogbones": 161
+    },
+    {
+      "name": "inner-layers-right",
+      "connected": 47,
+      "connectivity": true,
+      "matched": true,
+      "drc": true,
+      "fixedPowerDogbones": 161
+    },
+    {
+      "name": "inner-layers-left",
+      "connected": 47,
+      "connectivity": true,
+      "matched": true,
+      "drc": true,
+      "fixedPowerDogbones": 161
+    },
+    {
+      "name": "inner-layers-above",
+      "connected": 47,
+      "connectivity": true,
+      "matched": true,
+      "drc": true,
+      "fixedPowerDogbones": 161
+    },
+    {
+      "name": "inner-layers-complete-ca",
+      "connected": 47,
+      "connectivity": true,
+      "matched": true,
+      "drc": true,
+      "fixedPowerDogbones": 161
+    },
+    {
+      "name": "outer-layers",
+      "connected": 47,
+      "connectivity": true,
+      "matched": true,
+      "drc": true,
+      "fixedPowerDogbones": 161
+    }
+  ]
+}
