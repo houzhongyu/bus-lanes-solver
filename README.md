@@ -48,3 +48,5 @@ To reproduce the native checks in the solver checkout, install dependencies, run
 For the normal-Core comparison, use the source/dependency pins in provenance, bind the built solver package as Core's `@tscircuit/bus-lanes-solver` dependency, then run `bun BENCHMARK/scripts/run.ts --core CORE --circuit h616 --timeout 120 --out NEW_OUTPUT_DIRECTORY`. The benchmark uses the public Core circuit and native routing pipeline; no custom autorouter adapter is involved.
 
 Scope is the original 53-net DDR fixture. The separate 121-net whole-board reproduction is not timing-qualified.
+
+The final main/repro comparison also accepts 11/11 on both revisions, with identical validation reports, iterations and input hashes. Aggregate solver times are 1903.386/1889.299 seconds (main/repro). Production code is unchanged and no speedup is claimed. See the [repro comparison](repro-comparison.md), [numeric summary](repro-comparison.json), [acceptance/percentiles](repro-comparison-summary.json) and [raw paired reports](am3352-repro-paired-raw.json.gz). Both PRs pass all six full test shards, formatting, types, package validation, package preview and AM3352 acceptance.
