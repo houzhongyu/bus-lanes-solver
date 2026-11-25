@@ -56,5 +56,5 @@ test("H616 control signals match the completed clock paths", (): void => {
     const supplied = native.traces ?? []
     expect(routed.traces?.slice(0, supplied.length)).toEqual(supplied)
   }
-  expect(solver.solved).toMatchInlineSnapshot(`false`)
+  expect(solver.solved).toMatchInlineSnapshot(`true`)
 }, 130000)

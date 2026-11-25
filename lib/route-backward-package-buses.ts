@@ -172,17 +172,17 @@ export function* routeBackwardPackageBuses(
   }
   network.transforms = network.transforms.filter((t) => !locked.includes(t))
   network.copper = fixedCopper(network.local)
-  const generator = negotiateLanes(
-    network.local,
-    network.local.connections,
-    network.copper,
-    [],
-    network.widths,
-    undefined,
-    terminalLayers,
-    () => false,
-    true,
-  )
+  const generator = negotiateLanes({
+    input: network.local,
+    connections: network.local.connections,
+    fixedCopper: network.copper,
+    pairedTraces: [],
+    traceWidths: network.widths,
+    reportProgress: undefined,
+    terminalLayers: terminalLayers,
+    enableTerminalReservations: () => false,
+    deferRetainedSelfClearance: true,
+  })
   const originalNames = new Set(input.connections.map((c) => c.name))
   const busNames = new Set(input.buses?.flatMap((b) => b.connectionNames))
   const routeIds = new WeakMap<Trace, number>()

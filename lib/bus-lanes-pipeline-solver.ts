@@ -66,7 +66,10 @@ import {
   getCopperLayerNames,
   getRouteViaSpanLayers,
 } from "@tscircuit/fanout-solver"
-import { BusLanesSolver } from "./bus-lanes-solver"
+import {
+  BusLanesSolver,
+  getProvisionalCarrierSearchIterations,
+} from "./bus-lanes-solver"
 import type {
   Connection,
   SimpleRouteJson,
@@ -636,6 +639,12 @@ export class BusLanesPipelineSolver extends BaseSolver {
       : 0
     return {
       ...this.options,
+      analyticFallback:
+        this.options.analyticFallback ||
+        (this.carrierStrategy.name === "native_fallback" &&
+          this.routingInput.buses?.some(
+            (bus) => bus.skewReference !== undefined,
+          )),
       // Keep the aggregate pipeline budget. Restarting a dense bus at the
       // old per-layer cutoff discards compatible computed alternatives just
       // before they converge. Unconstrained controls retain a work reserve.
@@ -1320,10 +1329,11 @@ export class BusLanesPipelineSolver extends BaseSolver {
         this.childOptions(),
         terminalLayers,
       )
-    // Preserve successful allocations, while reserving aggregate work for
-    // movable sites if these provisional fixed approaches cannot route.
-    if (this.canNegotiateGeneratedSites)
-      this.child.MAX_ITERATIONS = Math.min(this.child.MAX_ITERATIONS, 12000)
+    this.child.MAX_ITERATIONS = getProvisionalCarrierSearchIterations({
+      input: laneInput,
+      availableIterations: this.child.MAX_ITERATIONS,
+      canNegotiateGeneratedSites: this.canNegotiateGeneratedSites,
+    })
   }
   _step() {
     if (performance.now() >= this.routingDeadline) {

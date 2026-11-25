@@ -24,13 +24,15 @@ function denseInput(): SimpleRouteJson {
 }
 
 function negotiation(input: SimpleRouteJson) {
-  return negotiateLanes(
-    input,
-    input.connections,
-    [],
-    [],
-    new Map(input.connections.map((c) => [c.name, input.minTraceWidth])),
-  )
+  return negotiateLanes({
+    input: input,
+    connections: input.connections,
+    fixedCopper: [],
+    pairedTraces: [],
+    traceWidths: new Map(
+      input.connections.map((c) => [c.name, input.minTraceWidth]),
+    ),
+  })
 }
 
 function expectReleased(search: GridVisibilitySearch) {

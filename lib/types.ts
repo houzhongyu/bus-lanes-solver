@@ -16,6 +16,20 @@ export interface Connection {
   nominalTraceWidth?: number
   width?: number
 }
+export type ConnectionName = Connection["name"]
+export interface BusLengthMatchingPath {
+  connectionName: ConnectionName
+  pcbPortIds: [string, string]
+  /** Physical endpoints remain available after the connection is completed. */
+  from?: Terminal
+  to?: Terminal
+}
+export interface LengthSkewConstraint {
+  names: ConnectionName[]
+  tolerance: number
+  skewReference?: "range" | "mean" | "references"
+  referenceNames?: ConnectionName[]
+}
 export interface Bus {
   busId: string
   name?: string
@@ -25,6 +39,10 @@ export interface Bus {
   /** Minimum total planar copper per member, including supplied fanouts, in mm. */
   minLength?: number
   maxLengthSkew?: number
+  /** Measure skew as a range (default) or maximum deviation from the mean. */
+  skewReference?: LengthSkewConstraint["skewReference"]
+  referenceConnectionNames?: ConnectionName[]
+  lengthMatchingPaths?: BusLengthMatchingPath[]
   traceWidth?: number
   preferredLayer?: string
   preferredLayers?: string[]
@@ -94,6 +112,8 @@ export interface SimpleRouteJson {
   }>
 }
 export interface SolverOptions {
+  /** Recover narrow passages analytically after all raster layers fail. */
+  analyticFallback?: boolean
   /** Reject paired tuning that folds back into a generated terminal via land. */
   protectPairedTerminalVias?: boolean
   /** Candidate budget for tuning the original paired corridor. */

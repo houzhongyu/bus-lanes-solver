@@ -37,6 +37,7 @@ import type {
   SimpleRouteJson,
   SolverOptions,
   Connection,
+  ConnectionName,
   Trace,
   Point,
   Wire,
@@ -55,13 +56,30 @@ import {
   assertLengthTargets,
   lengthConstraints,
   minimumLengthTargets,
+  hasLengthConstraints,
   pairLengthReports,
 } from "./route-lengths"
 import { busLengthReports } from "./route-lengths"
 import { spreadTuningLanes } from "./spread-tuning-lanes"
-import { tuneSmoothLengths } from "./smooth-length-tuning"
+import { matchSmoothLengths } from "./smooth-length-tuning"
 import { tuneLengths } from "./length-tuning"
 import { layerColor } from "./layer-colors"
+
+/** Untimed provisional approaches retain their existing escape-retry reserve.
+ * Matching uses the work already allocated by the shared pipeline budget. */
+export function getProvisionalCarrierSearchIterations({
+  input,
+  availableIterations,
+  canNegotiateGeneratedSites,
+}: {
+  input: SimpleRouteJson
+  availableIterations: number
+  canNegotiateGeneratedSites: boolean
+}): number {
+  if (canNegotiateGeneratedSites && !hasLengthConstraints(input))
+    return Math.min(availableIterations, 12000)
+  return availableIterations
+}
 /** Routes on an implicit clearance-offset visibility graph in board-world mm.
  * Every step expands a geometric vertex or commits a complete lane. */
 export class BusLanesSolver extends BaseSolver {
@@ -241,6 +259,32 @@ export class BusLanesSolver extends BaseSolver {
           bus.minLength > (bus.maxLength ?? Infinity))
       )
         throw Error("Invalid minimum bus length")
+    for (const bus of input.buses ?? []) {
+      if (new Set(bus.connectionNames).size !== bus.connectionNames.length)
+        throw Error("Duplicate member within a bus")
+      if (
+        bus.skewReference !== undefined &&
+        !["range", "mean", "references"].includes(bus.skewReference)
+      )
+        throw Error("Unknown bus skew reference")
+      if (bus.skewReference !== undefined && bus.maxLengthSkew === undefined)
+        throw Error("A skew reference requires a maximum skew")
+      if (bus.skewReference === "references") {
+        const references = bus.referenceConnectionNames ?? []
+        if (
+          !references.length ||
+          new Set(references).size !== references.length ||
+          bus.connectionNames.every((name) => references.includes(name)) ||
+          references.some(
+            (name) =>
+              !names.has(name) &&
+              !input.traces?.some((trace) => trace.connection_name === name),
+          )
+        )
+          throw Error("Invalid bus reference members")
+      } else if (bus.referenceConnectionNames !== undefined)
+        throw Error("Reference members require reference-relative skew")
+    }
     for (const b of input.buses ?? [])
       if (
         b.maxLengthSkew !== undefined &&
@@ -253,22 +297,32 @@ export class BusLanesSolver extends BaseSolver {
       if (
         members.length < 1 ||
         new Set(members).size !== members.length ||
-        members.some((n) => !names.has(n))
+        members.some(
+          (name) =>
+            !names.has(name) &&
+            !input.buses?.some((bus) =>
+              bus.referenceConnectionNames?.includes(name),
+            ),
+        )
       )
         throw Error("Invalid length matching members")
     }
-    const claimed = new Set<string>()
+    const busWidths = new Map<ConnectionName, number>()
     for (const b of input.buses ?? [])
       for (const name of b.connectionNames) {
         const c = input.connections.find((c) => c.name === name)
-        if (!c || claimed.has(name))
-          throw Error(`Missing or duplicated bus member ${name}`)
-        claimed.add(name)
+        if (!c) throw Error(`Missing or duplicated bus member ${name}`)
         const layer = c.pointsToConnect[0].layer
         if (b.allowedLayers && !b.allowedLayers.includes(layer))
           throw Error(`${b.busId}: forbidden layer ${layer}`)
         const width = b.traceWidth
-        if (width !== undefined) this.widths.set(name, width)
+        if (width !== undefined) {
+          const previousWidth = busWidths.get(name)
+          if (previousWidth !== undefined && previousWidth !== width)
+            throw Error("Overlapping buses request conflicting trace widths")
+          busWidths.set(name, width)
+          this.widths.set(name, width)
+        }
       }
     for (const width of this.widths.values())
       if (!Number.isFinite(width) || width <= 0 || width < input.minTraceWidth)
@@ -516,19 +570,20 @@ export class BusLanesSolver extends BaseSolver {
         }
       }
       this.reservePackageExits ??= backwardFacingPackageTerminals(this.input)
-      this.negotiated ??= negotiateLanes(
-        this.input,
-        this.orders[0],
-        this.fixed,
-        this.pairedTraces,
-        this.widths,
-        (pass, conflicts) => {
+      this.negotiated ??= negotiateLanes({
+        input: this.input,
+        connections: this.orders[0],
+        fixedCopper: this.fixed,
+        pairedTraces: this.pairedTraces,
+        traceWidths: this.widths,
+        reportProgress: (pass, conflicts) => {
           this.congestionPass = pass
           this.conflictingLanes = conflicts
         },
-        this.terminalLayers,
-        () => this.reservePackageExits!,
-      )
+        terminalLayers: this.terminalLayers,
+        enableTerminalReservations: () => this.reservePackageExits!,
+        analyticFallback: this.options.analyticFallback,
+      })
       const step = this.negotiated.next()
       if (!step.done) {
         this.traces = step.value
@@ -772,7 +827,10 @@ export class BusLanesSolver extends BaseSolver {
                 },
               )
             } else {
-              this.traces = tuneSmoothLengths(input, candidate, targets, {
+              this.traces = matchSmoothLengths({
+                input,
+                traces: candidate,
+                targets,
                 packageOnlyPairTuning,
               })
             }

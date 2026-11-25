@@ -4,10 +4,20 @@ import { foldedTuningLobes } from "./folded-tuning"
 import { packageApproachRegions, pointInBox } from "./package-approach-regions"
 import { tuningPathIsSelfClear } from "./length-tuning"
 import { smoothTuningLobes, roundedTuningLobes } from "./smooth-tuning"
-import { fixedRouteLength } from "./route-lengths"
+import {
+  fixedRouteLength,
+  minimumBalancedLengthTargets,
+  assertLengthTargets,
+} from "./route-lengths"
 import { distance, length, simplify, segmentDistance } from "./geometry"
 import { VectorScene, fixedCopper, routeCopper } from "./vector-scene"
-import type { SimpleRouteJson, Trace, Point, Wire } from "./types"
+import type {
+  SimpleRouteJson,
+  Trace,
+  Point,
+  Wire,
+  ConnectionName,
+} from "./types"
 
 /** A feasible partial tuning state is diagnostic input for a joint reroute,
  * never an accepted solution. */
@@ -17,6 +27,33 @@ export class IncompleteLengthTuningError extends Error {
     readonly unfinished: string[],
   ) {
     super(`Insufficient tuning clearance for ${unfinished.join(", ")}`)
+  }
+}
+
+/** Retry a blocked mean-matching bank with the same minimum total copper,
+ * distributed across the available lanes. Successful target plans stay intact. */
+export function matchSmoothLengths({
+  input,
+  traces,
+  targets,
+  packageOnlyPairTuning,
+}: {
+  input: SimpleRouteJson
+  traces: Trace[]
+  targets: Map<ConnectionName, number>
+  packageOnlyPairTuning: boolean
+}): Trace[] {
+  try {
+    return tuneSmoothLengths(input, traces, targets, { packageOnlyPairTuning })
+  } catch (error) {
+    if (
+      !(error instanceof IncompleteLengthTuningError) ||
+      !input.buses?.some((bus) => bus.skewReference === "mean")
+    )
+      throw error
+    const balanced = minimumBalancedLengthTargets({ input, traces })
+    assertLengthTargets(input, balanced)
+    return tuneSmoothLengths(input, traces, balanced, { packageOnlyPairTuning })
   }
 }
 
@@ -349,7 +386,7 @@ export function tuneSmoothLengths(
     if (!changed && !allowPartial) {
       allowPartial = true
       changed = true
-    } else if (!changed && !allowFolded && options.packMeanders) {
+    } else if (!changed && !allowFolded) {
       // Preserve all ordinary and partial-bank solutions before trying folded
       // pockets. Their separate bounded budget cannot starve package tuning.
       allowFolded = true

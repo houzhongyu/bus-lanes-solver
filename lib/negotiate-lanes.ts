@@ -1,4 +1,6 @@
-import { maximumCarrierLength } from "./route-lengths"
+import { repairGridJogs } from "./repair-grid-jogs"
+import { maximumCarrierLength, hasLengthConstraints } from "./route-lengths"
+import { routeAnalyticLane } from "./route-analytic-lane"
 import { refineRouteCandidates } from "./refine-route-candidates"
 import { routeViaWaypoint } from "./route-via-waypoint"
 import { pendingLaneCertificates } from "./pending-lane-certificates"
@@ -10,30 +12,60 @@ import { length } from "./geometry"
 import { RouteConflictIndex } from "./route-conflict-index"
 import { reduceOrdinaryTurns } from "./reduce-ordinary-turns"
 import { repairLaneClosures } from "./repair-lane-closures"
-import type { SimpleRouteJson, Connection, Trace, Wire } from "./types"
+import type {
+  SimpleRouteJson,
+  Connection,
+  ConnectionName,
+  Trace,
+  Wire,
+  Terminal,
+} from "./types"
+
+type CopperLayer = Terminal["layer"]
 
 /** Queue-based rip-up routing adapted from the reference's negotiate-fine.ts.
  * Supplied copper and generated paired corridors remain fixed. Runtime candidate
  * selection can combine earlier compatible alternatives; only complete,
  * nonoverlapping solutions are returned. Board-world mm. */
-export function* negotiateLanes(
-  input: SimpleRouteJson,
-  connections: Connection[],
-  fixed: Copper[],
-  paired: Trace[],
-  widths: Map<string, number>,
-  reportProgress?: (pass: number, conflictingLanes: number) => void,
-  terminalLayers: ReadonlyMap<string, string[]> = new Map(),
-  enableTerminalReservations: () => boolean = () => true,
+export function* negotiateLanes({
+  input,
+  connections,
+  fixedCopper,
+  pairedTraces,
+  traceWidths,
+  reportProgress,
+  terminalLayers = new Map(),
+  enableTerminalReservations = () => true,
   deferRetainedSelfClearance = false,
   checkReachability = false,
-): Generator<Trace[], Trace[] | null> {
+  analyticFallback = false,
+}: {
+  input: SimpleRouteJson
+  connections: Connection[]
+  fixedCopper: Copper[]
+  pairedTraces: Trace[]
+  traceWidths: Map<ConnectionName, number>
+  reportProgress?: (pass: number, conflictingLanes: number) => void
+  terminalLayers?: ReadonlyMap<ConnectionName, CopperLayer[]>
+  enableTerminalReservations?: () => boolean
+  deferRetainedSelfClearance?: boolean
+  checkReachability?: boolean
+  analyticFallback?: boolean
+}): Generator<Trace[], Trace[] | null> {
   const flexibleTerminals = connections.some(
     (connection) => (terminalLayers.get(connection.name)?.length ?? 1) > 1,
   )
-  const routed = new Map<string, Trace>()
-  const histories = new Map<string, Float32Array>()
-  const searches = new Map<string, GridHistoryProjector>()
+  // Fixed approaches do not move within a lane search. Parent retries build a
+  // new request, so measure each hard copper bound once per negotiation.
+  const hardLengthLimitsMm = new Map<ConnectionName, number>(
+    input.connections.map((connection) => [
+      connection.name,
+      maximumCarrierLength(input, connection.name),
+    ]),
+  )
+  const routed = new Map<ConnectionName, Trace>()
+  const histories = new Map<CopperLayer, Float32Array>()
+  const searches = new Map<CopperLayer, GridHistoryProjector>()
   const clearance =
     input.minTraceToPadEdgeClearance ?? input.defaultObstacleMargin ?? 0.075
   const pairs = (input.differentialPairs ?? []).filter(
@@ -58,8 +90,8 @@ export function* negotiateLanes(
       length(a.connections[0].pointsToConnect) -
         length(b.connections[0].pointsToConnect),
   )
-  const limits = new Map<string, number>()
-  const ceilings = new Map<string, number>()
+  const limits = new Map<ConnectionName, number>()
+  const ceilings = new Map<ConnectionName, number>()
   for (const bus of input.buses ?? []) {
     const members = connections.filter((c) =>
       bus.connectionNames.includes(c.name),
@@ -68,7 +100,7 @@ export function* negotiateLanes(
       // Reserve one percent of the compact search envelope for length tuning.
       1.5 * 0.99 * Math.max(...members.map((c) => length(c.pointsToConnect)))
     for (const member of members) {
-      const hardLimit = maximumCarrierLength(input, member.name)
+      const hardLimit = hardLengthLimitsMm.get(member.name)!
       limits.set(member.name, Math.min(limit, hardLimit))
       ceilings.set(member.name, Math.min((limit * 4) / 3, hardLimit))
     }
@@ -104,8 +136,8 @@ export function* negotiateLanes(
     }
     return copper
   }
-  const pairedCopper = paired.flatMap(getCopper)
-  const visits = new Map<string, number>()
+  const pairedCopper = pairedTraces.flatMap(getCopper)
+  const visits = new Map<ConnectionName, number>()
   const queue = [...units]
   let bestCount = 0,
     lastProgress = 0,
@@ -180,7 +212,7 @@ export function* negotiateLanes(
             conflicts.firstConflict(
               trace.route,
               other.route,
-              (widths.get(trace.connection_name!)! +
+              (traceWidths.get(trace.connection_name!)! +
                 (other.route[0] as Wire).width) /
                 2 +
                 clearance -
@@ -200,14 +232,14 @@ export function* negotiateLanes(
       const chosenLayer = available[0]
       for (const c of unit.connections)
         for (const point of c.pointsToConnect) point.layer = chosenLayer
-      const width = widths.get(connection.name)!,
+      const width = traceWidths.get(connection.name)!,
         layer = connection.pointsToConnect[0].layer
       routed.delete(connection.name)
       const routedLanes = [...routed.values()]
-      const progressRoutes = [...paired, ...routedLanes]
+      const progressRoutes = [...pairedTraces, ...routedLanes]
       const routedCopper = routedLanes.flatMap(getCopper)
       const sceneCopper = [
-        ...fixed,
+        ...fixedCopper,
         ...pairedCopper,
         ...(!unit.pair
           ? routedLanes
@@ -226,7 +258,7 @@ export function* negotiateLanes(
         // Generate rigid paired alternatives independently of provisional
         // lanes; compatibility selection can then move those lanes around the
         // new corridor instead of forcing every retry back to the old topology.
-        const generator = routeCoupledPair(input, unit.pair, fixed, {
+        const generator = routeCoupledPair(input, unit.pair, fixedCopper, {
           copper: [],
           penalty: 0,
           variant: visit - 1,
@@ -270,7 +302,7 @@ export function* negotiateLanes(
           input,
           connections.filter((c) => !pairedNames.has(c.name)),
           sceneCopper,
-          widths,
+          traceWidths,
         )
         let step = generator.next()
         try {
@@ -291,24 +323,6 @@ export function* negotiateLanes(
           )
           .flatMap(getCopper)
       }
-      const search = new GridVisibilitySearch(
-        scene,
-        connection.pointsToConnect[0],
-        connection.pointsToConnect[1],
-        [...routedCopper, ...pendingCopper],
-        congestionPenalty,
-        histories.get(layer),
-        {
-          maxLength: limits.get(connection.name),
-          paretoLength: Number.isFinite(
-            maximumCarrierLength(input, connection.name),
-          ),
-          checkReachability,
-        },
-      )
-      if (!histories.has(layer))
-        histories.set(layer, new Float32Array(search.cellCount))
-      searches.set(layer, search)
       // Port of compact-bays/route-controls.ts: search every reachable signal
       // layer and compare actual routes, rather than projecting a guessed path.
       let bestChoice: { trace: Trace; score: number } | undefined
@@ -319,39 +333,47 @@ export function* negotiateLanes(
           candidateLayer === layer
             ? scene
             : new VectorScene(input, connection, width, sceneCopper)
-        let candidateSearch =
-          candidateLayer === layer
-            ? search
-            : new GridVisibilitySearch(
-                candidateScene,
-                connection.pointsToConnect[0],
-                connection.pointsToConnect[1],
-                [...routedCopper, ...pendingCopper],
-                congestionPenalty,
-                histories.get(candidateLayer),
-                {
-                  maxLength: limits.get(connection.name),
-                  paretoLength: Number.isFinite(
-                    maximumCarrierLength(input, connection.name),
-                  ),
-                  checkReachability,
-                },
-              )
-        if (!histories.has(candidateLayer))
-          histories.set(
-            candidateLayer,
-            new Float32Array(candidateSearch.cellCount),
+        let candidateSearch: GridVisibilitySearch
+        let paretoLength = false
+        // Most lanes need one cost per grid point. Retain cost/length
+        // alternatives only if that first bounded search cannot finish.
+        do {
+          candidateSearch = new GridVisibilitySearch(
+            candidateScene,
+            connection.pointsToConnect[0],
+            connection.pointsToConnect[1],
+            [...routedCopper, ...pendingCopper],
+            congestionPenalty,
+            histories.get(candidateLayer),
+            {
+              maxLength: limits.get(connection.name),
+              paretoLength,
+              checkReachability,
+            },
           )
-        searches.set(candidateLayer, candidateSearch)
-        try {
-          while (!candidateSearch.solved && !candidateSearch.failed) {
-            candidateSearch.step()
-            yield progressRoutes
+          if (!histories.has(candidateLayer))
+            histories.set(
+              candidateLayer,
+              new Float32Array(candidateSearch.cellCount),
+            )
+          searches.set(candidateLayer, candidateSearch)
+          try {
+            while (!candidateSearch.solved && !candidateSearch.failed) {
+              candidateSearch.step()
+              yield progressRoutes
+            }
+          } finally {
+            if (!candidateSearch.solved && !candidateSearch.failed)
+              candidateSearch.cancel()
           }
-        } finally {
-          if (!candidateSearch.solved && !candidateSearch.failed)
-            candidateSearch.cancel()
-        }
+          if (
+            candidateSearch.solved ||
+            paretoLength ||
+            !Number.isFinite(hardLengthLimitsMm.get(connection.name)!)
+          )
+            break
+          paretoLength = true
+        } while (true)
         if (!candidateSearch.solved && limits.has(connection.name)) {
           // A soft-cost length-constrained search can exhaust its current
           // ordering even though a hard-clear path exists. Keep that shortest
@@ -365,7 +387,7 @@ export function* negotiateLanes(
             undefined,
             {
               checkReachability,
-              maxLength: maximumCarrierLength(input, connection.name),
+              maxLength: hardLengthLimitsMm.get(connection.name)!,
             },
           )
           try {
@@ -389,7 +411,7 @@ export function* negotiateLanes(
                 name,
                 Math.min(
                   length(candidateSearch.result) * 1.05,
-                  maximumCarrierLength(input, name),
+                  hardLengthLimitsMm.get(name)!,
                 ),
               )
           }
@@ -450,10 +472,7 @@ export function* negotiateLanes(
           if (step.value) paths.push(step.value)
         }
         for (const path of paths) {
-          if (
-            length(path) >
-            maximumCarrierLength(input, connection.name) + 1e-7
-          )
+          if (length(path) > hardLengthLimitsMm.get(connection.name)! + 1e-7)
             continue
           let hits = 0
           for (const other of routed.values()) {
@@ -485,6 +504,23 @@ export function* negotiateLanes(
           if (!bestChoice || score < bestChoice.score) bestChoice = choice
         }
       }
+      if (!bestChoice && analyticFallback) {
+        const analytic = routeAnalyticLane({
+          input,
+          connection,
+          width,
+          layers: available,
+          hardCopper: sceneCopper,
+          routedTraces: [...routed.values()],
+          maxLengthMm: hardLengthLimitsMm.get(connection.name)!,
+        })
+        let step = analytic.next()
+        while (!step.done) {
+          yield progressRoutes
+          step = analytic.next()
+        }
+        bestChoice = step.value
+      }
       if (!bestChoice) {
         if (!certificatePaths.length) return null
         // No candidate in this visit preserves the other terminals. Keep
@@ -500,7 +536,7 @@ export function* negotiateLanes(
         }
         queue.push(unit)
         reportProgress?.(iteration + 1, connections.length - routed.size)
-        yield [...paired, ...routed.values()]
+        yield [...pairedTraces, ...routed.values()]
         continue routing
       }
       for (const point of connection.pointsToConnect)
@@ -572,9 +608,6 @@ export function* negotiateLanes(
       lastProgress = iteration
     }
     let missing = connections.length - routed.size
-    // Fixed-layer repairs cannot explore the alternate planes of flexible
-    // handoffs. Keep negotiating those layer choices instead of repeatedly
-    // spending the bounded search budget on their current assignment.
     // A nearly complete bus can have a small pocket sealed by otherwise legal
     // lanes. Repair the local hard-constraint assignment instead of repeating
     // whole-board soft-cost sweeps. The parent still owns the shared budget.
@@ -592,9 +625,9 @@ export function* negotiateLanes(
       const generator = repairLaneClosures(
         input,
         connections,
-        [...fixed, ...pairedCopper],
+        [...fixedCopper, ...pairedCopper],
         [...routed.values()],
-        widths,
+        traceWidths,
         {
           deferRetainedSelfClearance,
           maxSubsetSize: 5,
@@ -606,7 +639,7 @@ export function* negotiateLanes(
       let step = generator.next()
       try {
         while (!step.done) {
-          yield [...paired, ...routed.values()]
+          yield [...pairedTraces, ...routed.values()]
           step = generator.next()
         }
       } finally {
@@ -622,7 +655,7 @@ export function* negotiateLanes(
     if (
       missing > 0 &&
       missing <= 3 &&
-      !flexibleTerminals &&
+      (!flexibleTerminals || hasLengthConstraints(input)) &&
       refinementAttempts < 2 &&
       iteration >=
         units.length *
@@ -634,8 +667,8 @@ export function* negotiateLanes(
       refinementAttempts++
       const generator = refineRouteCandidates(
         input,
-        [...fixed, ...pairedCopper],
-        widths,
+        [...fixedCopper, ...pairedCopper],
+        traceWidths,
         candidates,
         unitNames,
         matchingGroups,
@@ -644,7 +677,7 @@ export function* negotiateLanes(
       let step = generator.next()
       try {
         while (!step.done) {
-          yield [...paired, ...routed.values()]
+          yield [...pairedTraces, ...routed.values()]
           step = generator.next()
         }
       } finally {
@@ -663,17 +696,17 @@ export function* negotiateLanes(
       }
     }
     reportProgress?.(iteration + 1, missing)
-    yield [...paired, ...routed.values()]
+    yield [...pairedTraces, ...routed.values()]
     if (missing) continue
-    const result = [...paired, ...routed.values()]
+    const result = [...pairedTraces, ...routed.values()]
     for (const trace of routed.values()) {
       if (trace.coupledSection) continue
       const connection = connections.find(
           (c) => c.name === trace.connection_name,
         )!,
-        width = widths.get(connection.name)!
+        width = traceWidths.get(connection.name)!
       const scene = new VectorScene(input, connection, width, [
-        ...fixed,
+        ...fixedCopper,
         ...result.flatMap(routeCopper),
       ])
       trace.route = reduceOrdinaryTurns(trace.route, scene).map((p) => ({
@@ -682,6 +715,22 @@ export function* negotiateLanes(
         layer: connection.pointsToConnect[0].layer,
         width,
       }))
+    }
+    if (
+      !deferRetainedSelfClearance &&
+      input.buses?.some((bus) => bus.skewReference)
+    ) {
+      const repair = repairGridJogs(input, result, fixedCopper)
+      let repaired = repair.next()
+      try {
+        while (!repaired.done) {
+          yield result
+          repaired = repair.next()
+        }
+      } finally {
+        if (!repaired.done) repair.return(false)
+      }
+      if (!repaired.value) return null
     }
     return result
   }

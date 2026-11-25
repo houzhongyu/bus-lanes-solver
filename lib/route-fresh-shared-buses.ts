@@ -137,18 +137,18 @@ export function* routeFreshSharedBuses(
     const widths = new Map(
       pending.connections.map((c) => [c.name, signalWidth(native, c)]),
     )
-    const route = negotiateLanes(
-      pending,
-      pending.connections,
-      fixedCopper(pending),
-      [],
-      widths,
-      undefined,
-      layers,
-      () => false,
-      true,
-      true,
-    )
+    const route = negotiateLanes({
+      input: pending,
+      connections: pending.connections,
+      fixedCopper: fixedCopper(pending),
+      pairedTraces: [],
+      traceWidths: widths,
+      reportProgress: undefined,
+      terminalLayers: layers,
+      enableTerminalReservations: () => false,
+      deferRetainedSelfClearance: true,
+      checkReachability: true,
+    })
     let state: FlexibleSignalState | undefined
     try {
       let step = route.next(),

@@ -1,6 +1,8 @@
+import { maximumCarrierLength } from "./route-lengths"
 import { GridVisibilitySearch } from "./grid-visibility"
 import { routeCoupledPair } from "./coupled-pair-routing"
 import { reduceOrdinaryTurns } from "./reduce-ordinary-turns"
+import { length } from "./geometry"
 import { tuningPathIsSelfClear } from "./length-tuning"
 import { RouteCandidatePool } from "./select-route-candidates"
 import { VectorScene, routeCopper, type Copper } from "./vector-scene"
@@ -77,10 +79,10 @@ export function* refineRouteCandidates(
         continue
       }
       const original = input.connections.find((c) => c.name === name)!
-      const bus = input.buses?.some((b) => b.connectionNames.includes(name))
-      const layers = bus
-        ? [original.pointsToConnect[0].layer]
-        : (terminalLayers.get(name) ?? [original.pointsToConnect[0].layer])
+      const maximumLengthMm = maximumCarrierLength(input, name)
+      const layers = terminalLayers.get(name) ?? [
+        original.pointsToConnect[0].layer,
+      ]
       const others = core.filter((n) => n !== name)
       for (let trial = 0; trial < 12 && steps < 20000; trial++) {
         const conditional = candidates.conditionalRoutes(
@@ -106,6 +108,10 @@ export function* refineRouteCandidates(
             scene,
             connection.pointsToConnect[0],
             connection.pointsToConnect[1],
+            [],
+            0,
+            undefined,
+            { maxLength: maximumLengthMm },
           )
           try {
             while (
@@ -126,6 +132,7 @@ export function* refineRouteCandidates(
           // margin already includes the candidate's half-width. Self spacing
           // adds the other half-width, for width + requested clearance.
           if (!tuningPathIsSelfClear(points, width / 2 + scene.margin)) continue
+          if (length(points) > maximumLengthMm + 1e-7) continue
           const before = candidates.revisionNumber
           candidates.add(name, [
             {

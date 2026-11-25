@@ -15,17 +15,17 @@ export function* routePairedNetwork(
   const network = yield* preparePairedNetwork(input, layers)
   if (!network) return null
   const { local, copper, widths } = network
-  const negotiate = negotiateLanes(
-    local,
-    local.connections,
-    copper,
-    [],
-    widths,
-    undefined,
-    layers,
-    () => false,
-    true,
-  )
+  const negotiate = negotiateLanes({
+    input: local,
+    connections: local.connections,
+    fixedCopper: copper,
+    pairedTraces: [],
+    traceWidths: widths,
+    reportProgress: undefined,
+    terminalLayers: layers,
+    enableTerminalReservations: () => false,
+    deferRetainedSelfClearance: true,
+  })
   let raw: Trace[] | null = null,
     best = 0
   try {

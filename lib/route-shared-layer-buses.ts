@@ -120,17 +120,17 @@ export function* routeSharedLayerBuses(
       reachableLayers.set(connection.name, reachableForConnection)
     }
     if (!accessible) continue
-    const route = negotiateLanes(
-      busInput,
-      ordinary,
-      fixedCopper(local),
-      paired,
-      widths,
-      undefined,
-      bounded ? reachableLayers : new Map(),
-      () => !bounded,
-      true,
-    )
+    const route = negotiateLanes({
+      input: busInput,
+      connections: ordinary,
+      fixedCopper: fixedCopper(local),
+      pairedTraces: paired,
+      traceWidths: widths,
+      reportProgress: undefined,
+      terminalLayers: bounded ? reachableLayers : new Map(),
+      enableTerminalReservations: () => !bounded,
+      deferRetainedSelfClearance: true,
+    })
     let state = route.next(),
       steps = 0
     try {

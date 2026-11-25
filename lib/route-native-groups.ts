@@ -37,6 +37,8 @@ function groupsFor(input: SimpleRouteJson) {
  * overlapping timing groups and other geometries retain their existing solver.
  */
 export function nativeGroupsEligible(input: SimpleRouteJson) {
+  // Anchored native windows currently model range skew only.
+  if (input.buses?.some((bus) => bus.skewReference !== undefined)) return false
   if (
     input.outline?.length ||
     input.traces?.length ||

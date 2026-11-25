@@ -27,6 +27,8 @@ import type { SimpleRouteJson, Trace } from "./types"
  * groups may share a carrier or connect different axis-aligned package pairs.
  * Existing fanouts and overlapping timing groups retain their original path. */
 export function pinnedNativeBusesEligible(input: SimpleRouteJson) {
+  // Anchored native windows currently model range skew only.
+  if (input.buses?.some((bus) => bus.skewReference !== undefined)) return false
   if (
     input.outline?.length ||
     input.traces?.length ||
