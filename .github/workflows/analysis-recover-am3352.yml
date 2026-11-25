@@ -1,0 +1,54 @@
+name: Recover pinned AM3352 aggregate report
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        type: string
+        required: true
+      base_ref:
+        type: string
+        required: true
+      head_ref:
+        type: string
+        required: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.base_ref }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+          pattern: am3352-*
+          path: reports
+      - name: Report exact prior fresh solves without rerouting
+        env:
+          BASE_SHA: ${{ inputs.base_ref }}
+          HEAD_SHA: ${{ inputs.head_ref }}
+          ORIGINAL_RUN_ID: ${{ inputs.run_id }}
+        run: |
+          python3 - <<'PY_REPORT'
+          from pathlib import Path
+          p=Path('scripts/pr-benchmark/report.ts')
+          text=p.read_text()
+          assert 'options.prNumber <= 0' in text
+          p.write_text(text.replace('options.prNumber <= 0','options.prNumber < 0'))
+          PY_REPORT
+          bun --eval '
+            import {loadSamplePairs,renderComparison,summarizeComparison,SAMPLE_NAMES} from "./scripts/pr-benchmark/report";
+            const options={samples:await loadSamplePairs("reports"),mainSha:process.env.BASE_SHA,prSha:process.env.HEAD_SHA,controllerSha:process.env.BASE_SHA,prNumber:0,timeoutSeconds:3600,runUrl:`https://github.com/tscircuit/bus-lanes-solver/actions/runs/${process.env.ORIGINAL_RUN_ID}`};
+            console.log(renderComparison(options).replaceAll("PR #0","source candidate"));
+            const summary=summarizeComparison(options);
+            console.log("AM3352_SUMMARY="+JSON.stringify(summary));
+            if(!summary.artifactComplete||!summary.inputComparable||!summary.metadataComparable||summary.pr.accepted!==SAMPLE_NAMES.length)throw Error("Fresh comparison did not pass every acceptance check");
+          '
