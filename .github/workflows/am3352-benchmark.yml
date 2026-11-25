@@ -3,6 +3,15 @@ name: AM3352 benchmark
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      base_ref:
+        description: Immutable base source
+        type: string
+        required: true
+      head_ref:
+        description: Immutable head source
+        type: string
+        required: true
 
 permissions:
   contents: read
@@ -26,8 +35,8 @@ jobs:
       - name: Pin base and head
         id: refs
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          BASE_SHA: ${{ inputs.base_ref || github.event.pull_request.base.sha || github.sha }}
+          HEAD_SHA: ${{ inputs.head_ref || github.event.pull_request.head.sha || github.sha }}
         run: |
           echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
           echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
@@ -79,12 +88,25 @@ jobs:
             (
               cd "$checkout"
               if [[ -f bun.lock || -f bun.lockb ]]; then
-                bun install --frozen-lockfile --ignore-scripts
+                bun install --frozen-lockfile --ignore-scripts --backend=copyfile
               else
-                bun install --ignore-scripts
+                bun install --ignore-scripts --backend=copyfile
               fi
             )
           done
+      - name: Verify independent source dependencies
+        run: |
+          python3 - <<'PY_VERIFY'
+          from pathlib import Path
+          import hashlib
+          for entry in ['@tscircuit/fanout-solver/dist/index.js','yalps/dist/index.js']:
+              first=Path('base/node_modules')/entry
+              second=Path('head/node_modules')/entry
+              if not first.exists(): continue
+              assert first.read_bytes()==second.read_bytes(), entry
+              assert (first.stat().st_dev,first.stat().st_ino)!=(second.stat().st_dev,second.stat().st_ino), entry
+              print(entry, hashlib.sha256(first.read_bytes()).hexdigest())
+          PY_VERIFY
       - name: Fresh base and head solves with identical fixtures and budgets
         env:
           SAMPLE: ${{ matrix.sample }}
