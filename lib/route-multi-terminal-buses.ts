@@ -38,7 +38,17 @@ export function* routeMultiTerminalBuses(
       bus.maxLength !== undefined ||
       bus.maxLengthSkew !== undefined
     )
-      throw Error("Multi-terminal buses do not support length constraints")
+      for (const connectionName of bus.connectionNames) {
+        if (!branchedNames.has(connectionName)) continue
+        if (
+          !bus.lengthMatchingPaths?.some(
+            (path) => path.connectionName === connectionName,
+          )
+        )
+          throw Error(
+            "A branched timing constraint requires explicit path endpoints",
+          )
+      }
   }
   for (const pair of input.differentialPairs ?? []) {
     if (pair.connectionNames.some((name) => branchedNames.has(name)))
@@ -73,6 +83,38 @@ export function* routeMultiTerminalBuses(
       .sort((a, b) => b.padCount - a.padCount)
       .map(({ terminal }) => terminal),
   }))
+  for (const connection of connections) {
+    const paths =
+      input.buses
+        ?.flatMap((bus) => bus.lengthMatchingPaths ?? [])
+        .filter((path) => path.connectionName === connection.name) ?? []
+    if (!paths.length) continue
+    const [firstId, secondId] = paths[0].pcbPortIds
+    if (
+      paths.some(
+        (path) =>
+          path.pcbPortIds[0] !== firstId || path.pcbPortIds[1] !== secondId,
+      )
+    )
+      throw Error(
+        "Overlapping timing constraints select different endpoint paths",
+      )
+    const first = connection.pointsToConnect.find(
+      (terminal) => terminal.pcb_port_id === firstId,
+    )
+    const second = connection.pointsToConnect.find(
+      (terminal) => terminal.pcb_port_id === secondId,
+    )
+    if (!first || !second || first === second)
+      throw Error("Timing path endpoints must belong to the routed connection")
+    connection.pointsToConnect = [
+      first,
+      second,
+      ...connection.pointsToConnect.filter(
+        (terminal) => terminal !== first && terminal !== second,
+      ),
+    ]
+  }
   const completed: Trace[] = []
   const physicalLayers = getCopperLayerNames(input.layerCount)
   let groups: Connection[][] = [
@@ -92,12 +134,23 @@ export function* routeMultiTerminalBuses(
         connections: group,
         traces: [...(input.traces ?? []), ...completed],
         buses: input.buses
-          ?.map((bus) => ({
-            ...bus,
-            connectionNames: bus.connectionNames.filter((name) =>
-              names.has(name),
-            ),
-          }))
+          ?.map((bus) => {
+            const requested = {
+              ...bus,
+              connectionNames: bus.connectionNames.filter((name) =>
+                names.has(name),
+              ),
+            }
+            if (terminalIndex > 1) {
+              requested.minLength = undefined
+              requested.maxLength = undefined
+              requested.maxLengthSkew = undefined
+              requested.skewReference = undefined
+              requested.referenceConnectionNames = undefined
+              requested.lengthMatchingPaths = undefined
+            }
+            return requested
+          })
           .filter((bus) => bus.connectionNames.length > 0),
         differentialPairs: input.differentialPairs?.filter((pair) =>
           pair.connectionNames.every((name) => names.has(name)),

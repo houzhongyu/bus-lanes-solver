@@ -1,4 +1,6 @@
+import { repairGridJogs } from "./repair-grid-jogs"
 import { maximumCarrierLength } from "./route-lengths"
+import { routeAnalyticLane } from "./route-analytic-lane"
 import { refineRouteCandidates } from "./refine-route-candidates"
 import { routeViaWaypoint } from "./route-via-waypoint"
 import { pendingLaneCertificates } from "./pending-lane-certificates"
@@ -27,6 +29,7 @@ export function* negotiateLanes(
   enableTerminalReservations: () => boolean = () => true,
   deferRetainedSelfClearance = false,
   checkReachability = false,
+  analyticFallback = false,
 ): Generator<Trace[], Trace[] | null> {
   const flexibleTerminals = connections.some(
     (connection) => (terminalLayers.get(connection.name)?.length ?? 1) > 1,
@@ -485,6 +488,23 @@ export function* negotiateLanes(
           if (!bestChoice || score < bestChoice.score) bestChoice = choice
         }
       }
+      if (!bestChoice && analyticFallback) {
+        const analytic = routeAnalyticLane({
+          input,
+          connection,
+          width,
+          layers: available,
+          hardCopper: sceneCopper,
+          routedTraces: [...routed.values()],
+          maxLengthMm: maximumCarrierLength(input, connection.name),
+        })
+        let step = analytic.next()
+        while (!step.done) {
+          yield progressRoutes
+          step = analytic.next()
+        }
+        bestChoice = step.value
+      }
       if (!bestChoice) {
         if (!certificatePaths.length) return null
         // No candidate in this visit preserves the other terminals. Keep
@@ -682,6 +702,22 @@ export function* negotiateLanes(
         layer: connection.pointsToConnect[0].layer,
         width,
       }))
+    }
+    if (
+      !deferRetainedSelfClearance &&
+      input.buses?.some((bus) => bus.skewReference)
+    ) {
+      const repair = repairGridJogs(input, result, fixed)
+      let repaired = repair.next()
+      try {
+        while (!repaired.done) {
+          yield result
+          repaired = repair.next()
+        }
+      } finally {
+        if (!repaired.done) repair.return(false)
+      }
+      if (!repaired.value) return null
     }
     return result
   }

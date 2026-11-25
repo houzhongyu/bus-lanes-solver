@@ -1,5 +1,6 @@
+import { minimumMeanLengthTargets } from "./minimum-mean-length-targets"
 import { length } from "./geometry"
-import type { SimpleRouteJson, Trace } from "./types"
+import type { SimpleRouteJson, Trace, LengthSkewConstraint } from "./types"
 
 /** Planar copper length already routed for a connection. Via depth and package
  * delay require stackup/package data and are not inferred from XY coordinates. */
@@ -28,10 +29,30 @@ export function busLengthReports(input: SimpleRouteJson, traces: Trace[]) {
     })
     const complete = lengths.every((l) => l.totalLengthMm !== null)
     const values = lengths.map((l) => l.totalLengthMm ?? 0)
-    const skewMm =
+    let skewMm: number | null =
       complete && values.length
         ? Math.max(...values) - Math.min(...values)
         : null
+    if (complete && values.length && bus.skewReference === "mean") {
+      const mean = values.reduce((sum, value) => sum + value, 0) / values.length
+      skewMm = Math.max(...values.map((value) => Math.abs(value - mean)))
+    } else if (complete && bus.skewReference === "references") {
+      const references = bus.referenceConnectionNames ?? []
+      const anchors = lengths
+        .filter((l) => references.includes(l.name))
+        .map((l) => l.totalLengthMm!)
+      const subjects = lengths
+        .filter((l) => !references.includes(l.name))
+        .map((l) => l.totalLengthMm!)
+      skewMm =
+        anchors.length && subjects.length
+          ? Math.max(
+              ...subjects.flatMap((subject) =>
+                anchors.map((anchor) => Math.abs(subject - anchor)),
+              ),
+            )
+          : null
+    }
     return {
       busId: bus.busId,
       minLengthMm: bus.minLength ?? null,
@@ -56,13 +77,17 @@ export function busLengthReports(input: SimpleRouteJson, traces: Trace[]) {
 }
 
 /** Existing SRJ skew bounds; omitted bus bounds do not request tuning. */
-export function lengthConstraints(input: SimpleRouteJson) {
+export function lengthConstraints(
+  input: SimpleRouteJson,
+): LengthSkewConstraint[] {
   return [
     ...(input.buses ?? [])
       .filter((b) => b.maxLengthSkew !== undefined)
       .map((b) => ({
         names: b.connectionNames,
         tolerance: b.maxLengthSkew!,
+        skewReference: b.skewReference,
+        referenceNames: b.referenceConnectionNames,
       })),
     ...(input.differentialPairs ?? []).map((p) => ({
       names: p.connectionNames,
@@ -86,6 +111,12 @@ export function minimumLengthTargets(input: SimpleRouteJson, traces: Trace[]) {
         if (targets.has(name))
           targets.set(name, Math.max(targets.get(name)!, bus.minLength))
   const constraints = lengthConstraints(input)
+  if (constraints.some((c) => c.skewReference))
+    return minimumMeanLengthTargets({
+      input,
+      targets,
+      skewConstraints: constraints,
+    })
   for (let pass = 0; pass < targets.size; pass++) {
     let changed = false
     for (const { names, tolerance } of constraints) {

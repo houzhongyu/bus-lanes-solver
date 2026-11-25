@@ -15,6 +15,8 @@ export interface NativeSingleCarrierOptions
     NativeCarrierMatchingOptions {}
 
 export function nativeSingleCarrierEligible(input: SimpleRouteJson) {
+  // Anchored native windows currently model range skew only.
+  if (input.buses?.some((bus) => bus.skewReference !== undefined)) return false
   return (
     input.allowedLayers?.length === 1 &&
     /^inner\d+$/.test(input.allowedLayers[0]) &&

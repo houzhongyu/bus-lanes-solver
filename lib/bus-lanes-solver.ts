@@ -257,19 +257,45 @@ export class BusLanesSolver extends BaseSolver {
       )
         throw Error("Invalid length matching members")
     }
-    const claimed = new Set<string>()
+    for (const bus of input.buses ?? []) {
+      if (new Set(bus.connectionNames).size !== bus.connectionNames.length)
+        throw Error("Duplicate member within a bus")
+      if (
+        bus.skewReference !== undefined &&
+        bus.skewReference !== "mean" &&
+        bus.skewReference !== "references"
+      )
+        throw Error("Invalid bus skew reference")
+      if (bus.skewReference !== undefined && bus.maxLengthSkew === undefined)
+        throw Error("A skew reference requires a maximum skew")
+      if (bus.skewReference === "references") {
+        const references = bus.referenceConnectionNames ?? []
+        if (
+          !references.length ||
+          references.length >= bus.connectionNames.length ||
+          new Set(references).size !== references.length ||
+          references.some((name) => !bus.connectionNames.includes(name))
+        )
+          throw Error("Invalid bus reference members")
+      } else if (bus.referenceConnectionNames !== undefined)
+        throw Error("Reference members require reference-relative skew")
+    }
+    const busWidths = new Map<string, number>()
     for (const b of input.buses ?? [])
       for (const name of b.connectionNames) {
         const c = input.connections.find((c) => c.name === name)
-        if (!c || claimed.has(name))
-          throw Error(`Missing or duplicated bus member ${name}`)
-        claimed.add(name)
+        if (!c) throw Error(`Missing bus member ${name}`)
         const layer = c.pointsToConnect[0].layer
         if (b.allowedLayers && !b.allowedLayers.includes(layer))
           throw Error(`${b.busId}: forbidden layer ${layer}`)
-        const width = b.traceWidth
-        if (width !== undefined) this.widths.set(name, width)
+        if (b.traceWidth !== undefined) {
+          const previousWidth = busWidths.get(name)
+          if (previousWidth !== undefined && previousWidth !== b.traceWidth)
+            throw Error("Overlapping buses request conflicting trace widths")
+          busWidths.set(name, b.traceWidth)
+        }
       }
+    for (const [name, width] of busWidths) this.widths.set(name, width)
     for (const width of this.widths.values())
       if (!Number.isFinite(width) || width <= 0 || width < input.minTraceWidth)
         throw Error("Invalid trace width")
@@ -528,6 +554,9 @@ export class BusLanesSolver extends BaseSolver {
         },
         this.terminalLayers,
         () => this.reservePackageExits!,
+        false,
+        false,
+        this.options.analyticFallback,
       )
       const step = this.negotiated.next()
       if (!step.done) {
