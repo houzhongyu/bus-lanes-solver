@@ -36,7 +36,9 @@ The eleven AM3352 images below were regenerated from separate fresh solves of th
 - [inner-layers-complete-ca](am3352/inner-layers-complete-ca.png)
 - [outer-layers](am3352/outer-layers.png)
 
-Final-revision paired Blacksmith reports are retained in the linked workflow artifacts. Every pair uses Bun 1.4.0, Linux x64 on a Blacksmith 4-vCPU runner, a pinned base harness, identical fixtures and a 3,600-second per-solver/sample budget.
+The combined fix comparison freshly accepts all eleven samples on both base and head. Every validation report, iteration count and input hash is identical; no cases regress. Aggregate solver times are 1,744.8 seconds base and 1,694.5 seconds head; P50 is 42.918/43.070 seconds and P95 is 554.006/537.531 seconds. Timings vary and no speedup is claimed. See the [full comparison](comparison.md), [numeric summary](comparison.json), [percentiles and acceptance summary](comparison-summary.json) and [raw paired reports](am3352-paired-raw.json.gz).
+
+Final-revision paired Blacksmith reports are also retained in the linked workflow artifacts. Every pair uses Bun 1.4.0, Linux x64 on a Blacksmith 4-vCPU runner, a pinned base harness, identical fixtures and a 3,600-second per-solver/sample budget.
 
 - [Repro/main comparison](https://github.com/tscircuit/bus-lanes-solver/actions/runs/45563262527): main `69e2159` against repro `50e1d0e`.
 - [Combined fix comparison](https://github.com/tscircuit/bus-lanes-solver/actions/runs/45562507619): repro `50e1d0e` against fix `bb22465`.
