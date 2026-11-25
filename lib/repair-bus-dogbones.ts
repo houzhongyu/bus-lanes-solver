@@ -158,7 +158,7 @@ export function* repairBusDogbones(
           undefined,
           new Map(),
           () => false,
-          true,
+          { deferRetainedSelfClearance: true },
         )
         let state = generator.next()
         let steps = 0

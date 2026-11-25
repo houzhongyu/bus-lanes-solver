@@ -1,9 +1,10 @@
-import { expect, test } from "bun:test"
+import { test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { gunzipSync } from "node:zlib"
 import { BusLanesPipelineSolver, type SimpleRouteJson } from "../lib"
+import { expectCompletedRouting } from "./fixtures/expect-completed-routing"
 
-test("native H616 data, masks, and strobes matching phase", (): void => {
+test("routes and matches the native H616 data, masks, and strobes", (): void => {
   const input = JSON.parse(
     gunzipSync(
       readFileSync(
@@ -11,17 +12,8 @@ test("native H616 data, masks, and strobes matching phase", (): void => {
       ),
     ).toString("utf8"),
   ) as SimpleRouteJson
+  const original = structuredClone(input)
   const solver = new BusLanesPipelineSolver(input)
   solver.solve()
-  expect({
-    requested: input.connections.length,
-    solved: solver.solved,
-    error: solver.error,
-  }).toMatchInlineSnapshot(`
-    {
-      "error": "Negotiated lane search exhausted without a complete route",
-      "requested": 22,
-      "solved": false,
-    }
-  `)
+  expectCompletedRouting(solver, original)
 }, 120_000)

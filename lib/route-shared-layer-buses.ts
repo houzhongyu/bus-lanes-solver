@@ -129,7 +129,7 @@ export function* routeSharedLayerBuses(
       undefined,
       bounded ? reachableLayers : new Map(),
       () => !bounded,
-      true,
+      { deferRetainedSelfClearance: true },
     )
     let state = route.next(),
       steps = 0

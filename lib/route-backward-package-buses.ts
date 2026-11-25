@@ -181,7 +181,7 @@ export function* routeBackwardPackageBuses(
     undefined,
     terminalLayers,
     () => false,
-    true,
+    { deferRetainedSelfClearance: true },
   )
   const originalNames = new Set(input.connections.map((c) => c.name))
   const busNames = new Set(input.buses?.flatMap((b) => b.connectionNames))

@@ -636,6 +636,9 @@ export class BusLanesPipelineSolver extends BaseSolver {
       : 0
     return {
       ...this.options,
+      analyticFallback:
+        this.options.analyticFallback ||
+        this.carrierStrategy.name === "native_fallback",
       // Keep the aggregate pipeline budget. Restarting a dense bus at the
       // old per-layer cutoff discards compatible computed alternatives just
       // before they converge. Unconstrained controls retain a work reserve.
@@ -1632,6 +1635,7 @@ export class BusLanesPipelineSolver extends BaseSolver {
         [
           "no_planar_route",
           "coupled_routing_failed",
+          "length_matching_failed",
           "search_budget_exhausted",
         ].includes(this.child.failureCode ?? "") &&
         this.retryWithNativeCarriers(this.child.failureCode!)

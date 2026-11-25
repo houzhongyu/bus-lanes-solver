@@ -24,7 +24,7 @@ export function* routePairedNetwork(
     undefined,
     layers,
     () => false,
-    true,
+    { deferRetainedSelfClearance: true },
   )
   let raw: Trace[] | null = null,
     best = 0
