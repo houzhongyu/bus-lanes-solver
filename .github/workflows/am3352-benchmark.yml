@@ -158,6 +158,13 @@ jobs:
           MATRIX_RESULT: ${{ needs.benchmark.result }}
         run: |
           mkdir -p reports
+          python3 - <<'PY_DISPATCH'
+          from pathlib import Path
+          p=Path('scripts/pr-benchmark/report.ts')
+          text=p.read_text()
+          assert 'options.prNumber <= 0' in text
+          p.write_text(text.replace('options.prNumber <= 0','options.prNumber < 0'))
+          PY_DISPATCH
           bun --eval '
             import { appendFileSync } from "node:fs";
             import { SAMPLE_NAMES, loadSamplePairs, renderComparison, summarizeComparison } from "./scripts/pr-benchmark/report.ts";
