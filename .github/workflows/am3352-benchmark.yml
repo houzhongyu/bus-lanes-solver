@@ -165,6 +165,7 @@ jobs:
             const markdown = renderComparison(options);
             await Bun.write("comparison.md", markdown);
             appendFileSync(process.env.GITHUB_STEP_SUMMARY, markdown);
+            console.log(markdown);
             const summary = summarizeComparison(options);
             console.log(`Fresh head acceptance: ${summary.pr.accepted}/${SAMPLE_NAMES.length}`);
             if (process.env.MATRIX_RESULT !== "success" || !summary.artifactComplete ||
