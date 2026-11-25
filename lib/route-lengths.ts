@@ -60,8 +60,6 @@ export function fixedRouteLength(
       )
     return shortest
   }
-  if (!connection)
-    throw Error("A fixed timing reference needs explicit endpoint paths")
   return (input.traces ?? [])
     .filter(
       (t) =>
