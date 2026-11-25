@@ -1,11 +1,19 @@
 import { length } from "./geometry"
 import { measureSignalPath } from "./measure-signal-path"
 import { solveLengthTargets } from "./solve-length-targets"
-import type { LengthSkewConstraint, SimpleRouteJson, Trace } from "./types"
+import type {
+  ConnectionName,
+  LengthSkewConstraint,
+  SimpleRouteJson,
+  Trace,
+} from "./types"
 
 /** Planar copper length already routed for a connection. Via depth and package
  * delay require stackup/package data and are not inferred from XY coordinates. */
-export function fixedRouteLength(input: SimpleRouteJson, name: string) {
+export function fixedRouteLength(
+  input: SimpleRouteJson,
+  name: ConnectionName,
+): number {
   const connection = input.connections.find(
     (candidate) => candidate.name === name,
   )

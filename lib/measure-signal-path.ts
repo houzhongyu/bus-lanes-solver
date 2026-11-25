@@ -29,15 +29,26 @@ function copperNode(graph: CopperGraph, point: Terminal): CopperNodeId {
   return graph.points.length - 1
 }
 
-function connectCopper(
-  graph: CopperGraph,
-  a: CopperNodeId,
-  b: CopperNodeId,
-  lengthMm: number,
-): void {
-  if (a === b) return
-  graph.links[a].set(b, Math.min(graph.links[a].get(b) ?? Infinity, lengthMm))
-  graph.links[b].set(a, Math.min(graph.links[b].get(a) ?? Infinity, lengthMm))
+function connectCopper({
+  graph,
+  fromNode,
+  toNode,
+  lengthMm,
+}: {
+  graph: CopperGraph
+  fromNode: CopperNodeId
+  toNode: CopperNodeId
+  lengthMm: number
+}): void {
+  if (fromNode === toNode) return
+  graph.links[fromNode].set(
+    toNode,
+    Math.min(graph.links[fromNode].get(toNode) ?? Infinity, lengthMm),
+  )
+  graph.links[toNode].set(
+    fromNode,
+    Math.min(graph.links[toNode].get(fromNode) ?? Infinity, lengthMm),
+  )
 }
 
 /** Shortest connected pad-to-pad centerline in board-world mm (+X right,
@@ -82,7 +93,12 @@ export function measureSignalPath({
           copperNode(graph, { ...point, layer }),
         )
         for (const node of nodes.slice(1))
-          connectCopper(graph, nodes[0], node, 0)
+          connectCopper({
+            graph,
+            fromNode: nodes[0],
+            toNode: node,
+            lengthMm: 0,
+          })
         continue
       }
       copperNode(graph, point)
@@ -120,12 +136,12 @@ export function measureSignalPath({
     for (let index = 1; index < onSegment.length; index++) {
       const first = onSegment[index - 1]
       const second = onSegment[index]
-      connectCopper(
+      connectCopper({
         graph,
-        first,
-        second,
-        distance(graph.points[first], graph.points[second]),
-      )
+        fromNode: first,
+        toNode: second,
+        lengthMm: distance(graph.points[first], graph.points[second]),
+      })
     }
   }
   const queue = new MinHeap<{ node: CopperNodeId; f: number }>()
